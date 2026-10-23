@@ -26,7 +26,7 @@ function homeHtml() {
       <span class="chip-unit">${ICON.home}${esc(unit.name)}</span>
     </header>` : `
     <header class="hero">
-      <small>Urlaub am Hochkönig</small>
+      <small>Natur. Ruhe. Erholung.</small>
       <h1>${esc(site.hofName || 'Willkommen')}</h1>
     </header>`;
   if (store && store.mode === 'demo') {
@@ -42,7 +42,7 @@ function homeHtml() {
     const open = myOrders.filter((o) => o.status !== 'storniert' && o.date >= G.today());
     html += `<section class="card breakfast-card">
       <h2>${ICON.bread} Frühstück bestellen</h2>
-      <p>Frisches Gebäck vom Bäcker${(site.products || []).some((p) => p.active !== false && p.group === 'hof') ? ' und Produkte von unserem Bio-Bauernhof' : ''} – direkt zu eurer Unterkunft.</p>
+      <p>Frisch vom Bäcker, mit Liebe für euch – direkt zu eurer Unterkunft${(site.products || []).some((p) => p.active !== false && p.group === 'hof') ? '. Dazu gibt es Produkte von unserem Bio-Bauernhof' : ''}.</p>
       ${P.deliveryText ? `<p class="muted" style="font-size:15px">${esc(P.deliveryText)}</p>` : ''}
       <div class="deadline">${ICON.clock}<span>Für <b>${esc(G.fmtDayRel(day))}</b> bestellbar bis <b>${esc(G.fmtDeadline(dl))}</b> (noch ${G.countdown(dl - G.now())})</span></div>
       <a class="btn warm" href="#bestellen">${ICON.bread} Jetzt bestellen</a>
@@ -50,6 +50,7 @@ function homeHtml() {
     </section>`;
   } else if (!unit) {
     html += `<div class="note-box">Scannt den QR-Code in eurer Unterkunft – dann seht ihr hier eure Gästemappe${site.breakfast !== false ? ' und könnt Frühstück bestellen' : ''}.</div>
+      <p class="muted">Drei besondere Orte – eingebettet in die wunderschöne Bergwelt am Hochkönig. Ob zu zweit, mit der Familie oder in großer Runde: Bei uns findet jeder seinen Lieblingsplatz.</p>
       <div class="section-title">Unsere Unterkünfte</div>
       <div class="list">${(site.properties || []).map((p) => `<a class="order" style="display:block;text-decoration:none;color:inherit" href="${esc(p.website || '#')}" target="_blank" rel="noopener">
         <div class="head"><b>${esc(p.name)}</b><span>${ICON.chevron}</span></div><small>${esc(p.subtitle || '')}</small></a>`).join('')}</div>`;
@@ -109,7 +110,15 @@ function orderViewHtml() {
   const days = orderableDays();
   if (!chosenDay || !days.includes(chosenDay)) chosenDay = days[0];
   const prods = (site.products || []).filter((p) => p.active !== false);
-  const groups = [['baecker', 'Vom Bäcker'], ['hof', 'Vom Hof']];
+  // Gebäck nach Kategorien (Gebäck, Brot, Süßes & Feines), danach Produkte vom Hof
+  const groups = [];
+  prods.forEach((p) => {
+    const label = (p.group || 'baecker') === 'hof' ? 'Vom Hof' : (p.cat || 'Vom Bäcker');
+    let g = groups.find((x) => x[0] === label);
+    if (!g) groups.push((g = [label, []]));
+    g[1].push(p);
+  });
+  groups.sort((a, b) => (a[0] === 'Vom Hof') - (b[0] === 'Vom Hof'));
   const savedName = G.store(NAME_KEY) || '';
   return `
     <div class="topnav"><a class="icon-btn" href="#" aria-label="Zurück">${ICON.back}</a><h1>Frühstück bestellen</h1></div>
@@ -118,9 +127,7 @@ function orderViewHtml() {
     <div class="days">${days.map((d) => `<button class="day ${d === chosenDay ? 'on' : ''}" data-day="${d}">
       <b>${esc(G.relDay(d) ? G.relDay(d)[0].toUpperCase() + G.relDay(d).slice(1) : G.fmtDay(d, { weekday: 'long' }))}</b>
       <small>${esc(G.fmtDay(d, { day: 'numeric', month: 'numeric' }))} · bis ${esc(G.fmtDeadline(G.deadlineFor(d, cutoff())).replace(' um ', ', '))}</small></button>`).join('')}</div>
-    ${groups.map(([g, label]) => {
-      const list = prods.filter((p) => (p.group || 'baecker') === g);
-      if (!list.length) return '';
+    ${groups.map(([label, list]) => {
       return `<div class="section-title">${label}</div><div class="list">${list.map((p) => {
         const q = cart[p.id] || 0;
         return `<div class="prod ${q ? 'has' : ''}" data-prod="${esc(p.id)}">

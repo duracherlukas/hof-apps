@@ -140,29 +140,32 @@ G.ICON = {
   list: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   book: '<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg>',
 };
-G.SECTION_ICONS = ['home', 'key', 'wifi', 'rules', 'recycle', 'sos', 'map', 'mountain', 'egg', 'bread', 'car', 'phone', 'info', 'book'];
+G.SECTION_ICONS = ['home', 'key', 'wifi', 'rules', 'recycle', 'sos', 'map', 'mountain', 'egg', 'bread', 'car', 'phone', 'info', 'book', 'euro'];
 
 // ---------- Startinhalte: drei Betriebe der Familie Herzog ----------
 const NOTRUF = '- **112** – Euro-Notruf\n- **144** – Rettung\n- **122** – Feuerwehr\n- **133** – Polizei\n- **140** – Bergrettung / Alpinnotruf\n- **141** – Ärztenotdienst\n- **1450** – Gesundheitsberatung';
 const HOCHKOENIG_CARD = 'Mit der **Hochkönig Card** habt ihr als unsere Gäste viele Vorteile:\n\n**Sommer**\n- Unbegrenzt gratis mit den Bergbahnen in Maria Alm, Hintermoos, Hinterthal, Dienten und Mühlbach\n- Freier Eintritt ins Freibad Maria Alm und Mühlbach\n\n**Winter**\n- Einmal gratis Nachtskifahren in Maria Alm\n- Gratis GoPro-Helmkamera-Verleih\n- Weitere Ermäßigungen in der Region\n\nFragt uns einfach nach eurer Karte.';
+const FLEISCH_LISTE = '- **Beiried-Steak** – € 45 / kg\n- **Hüftsteak** – € 40 / kg\n- **Schnitzel** – € 30 / kg\n- **Rinderbraten** – € 20 / kg\n- **Gulasch** – € 15 / kg\n- **Faschiertes** – € 15 / kg\n- **Mischpaket 10 kg** (verschiedene Sorten) – € 180\n\nAlles ist **vakuumiert und tiefgekühlt** – perfekt zum Mitnehmen oder für euren Aufenthalt.\n\nFragt uns gerne – wir beraten euch!';
+const fleisch = (intro) => ({ id: 'fleisch', icon: 'euro', title: 'Fleisch vom Stegerbauer', text: intro + '\n\n' + FLEISCH_LISTE });
 const MUELL = 'Bitte trennt euren Müll – danke! Die Tonnen findet ihr [hier eintragen].\n\n- **Restmüll** – schwarze Tonne\n- **Bio** – braune Tonne\n- **Papier** – rote Tonne\n- **Plastik & Metall** – gelber Sack\n- **Glas** – [hier eintragen]';
 
 G.defaultProperties = () => [
   {
     id: 'stegerbauer',
     name: 'Bio-Bauernhof Stegerbauer',
-    subtitle: 'Urlaub am Bauernhof in Maria Alm',
+    subtitle: '4 Ferienwohnungen für 2–5 Personen · Maria Alm',
     phone: '+43 664 4805399',
     whatsapp: '',
     email: 'stegerbauer@sbg.at',
     website: 'https://www.urlaub-hochkoenig.at/',
     deliveryText: 'Wir bringen euch das Gebäck in der Früh vor die Wohnung bzw. zu eurem Wohnmobil.',
     sections: [
-      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr bei uns am **Bio-Bauernhof Stegerbauer** in Maria Alm seid!\n\nHier findet ihr alles Wichtige für euren Urlaub. Wenn etwas fehlt oder nicht passt, meldet euch jederzeit bei uns – wir helfen gerne.\n\nEure Familie Herzog' },
+      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr bei uns am **Bio-Bauernhof Stegerbauer** in Maria Alm seid!\n\nKomfortable Ferienwohnungen mit viel Herz und Blick auf die Berge – der perfekte Ort für erholsame Tage zu jeder Jahreszeit.\n\nHier findet ihr alles Wichtige für euren Urlaub. Wenn etwas fehlt oder nicht passt, meldet euch jederzeit bei uns – wir helfen gerne.\n\nEure Familie Herzog' },
       { id: 'anreise', icon: 'key', title: 'An- & Abreise', text: '- Adresse: **Stegen 16, 5761 Maria Alm**\n- Anreise ab **[Uhrzeit eintragen]**\n- Abreise bis **[Uhrzeit eintragen]**\n- Parken: [hier eintragen]' },
-      { id: 'wohnung', icon: 'home', title: 'Eure Ferienwohnung', text: '- **WLAN** gratis – Name und Passwort stehen oben\n- Kabel-TV, Safe\n- Küche mit Herd, Geschirrspüler, Mikrowelle, Kühlschrank mit Gefrierfach, Kaffeemaschine und Wasserkocher\n- Balkon\n- Für die Kleinsten: **Babybett, Wickelauflage und Babybadewanne** – sagt uns einfach Bescheid' },
-      { id: 'stellplatz', icon: 'car', title: 'Wohnmobil-Stellplatz', text: '- Strom, Frischwasser und Entsorgung direkt am Platz\n- Ganzjährig geöffnet\n- Ins Ortszentrum sind es ca. 10 Minuten\n- Frische Semmeln könnt ihr hier in der App für den nächsten Morgen bestellen' },
+      { id: 'wohnung', icon: 'home', title: 'Eure Ferienwohnung', text: 'Unsere **4 Ferienwohnungen** sind für 2 bis 5 Personen eingerichtet.\n\n- **WLAN** gratis – Name und Passwort stehen oben\n- Kabel-TV, Safe\n- Küche mit Herd, Geschirrspüler, Mikrowelle, Kühlschrank mit Gefrierfach, Kaffeemaschine und Wasserkocher\n- Balkon\n- Für die Kleinsten: **Babybett, Wickelauflage und Babybadewanne** – sagt uns einfach Bescheid' },
+      { id: 'stellplatz', icon: 'car', title: 'Wohnmobil-Stellplatz', text: '**Preise pro Nacht** (für 1 Wagen und 1 Person)\n\n**Sommer**\n- ohne Strom: **€ 23**\n- mit Strom: **€ 25**\n\n**Winter**\n- ohne Strom: **€ 25**\n- mit Strom: **€ 30**\n\nJede weitere Person über 15 Jahre: **€ 4** pro Nacht\n\n- Strom, Frischwasser und Entsorgung direkt am Platz\n- Ganzjährig geöffnet\n- Ins Ortszentrum sind es ca. 10 Minuten\n- Frische Semmeln könnt ihr hier in der App für den nächsten Morgen bestellen' },
       { id: 'tiere', icon: 'egg', title: 'Unsere Tiere', text: 'Bei uns am Hof leben **Mutterkühe mit Kälbern und Stieren, Noriker-Pferde und Ponys mit Fohlen, Schafe, Ziegen, Hühner, Hasen, Katzen** und unser Hofhund **Lea**.\n\nIm Sommer sind die meisten Tiere oben auf der Alm – dort könnt ihr sie besuchen. Ziegen, Schafe, Hühner, Katzen und Lea bleiben am Hof.\n\nBitte füttert die Tiere nur nach Absprache mit uns.' },
+      fleisch('Bestes Fleisch von unseren eigenen Tieren – mit viel Sorgfalt aufgezogen und in bester Qualität.'),
       { id: 'spielplatz', icon: 'info', title: 'Spielplatz', text: 'Vor dem Haus gibt es einen großen Spielplatz mit **Rutsche, Schaukel, Sandkiste, Spielhaus, Kletterturm, Trampolinen, Slackline, Go-Karts und Kindertraktoren** – und einen kleinen Fischteich.\n\nBitte passt auf die Kleinen auf, besonders beim Teich.' },
       { id: 'hausregeln', icon: 'rules', title: 'Hausregeln', text: '- Nachtruhe von 22:00 bis 7:00 Uhr\n- Rauchen bitte nur im Freien\n- Haustiere sind willkommen (einmalig € 20)\n- Wir sind ein Arbeitsbetrieb: Bitte lasst Kinder nicht unbeaufsichtigt beim Stall, bei den Maschinen oder auf dem Hofplatz.' },
       { id: 'card', icon: 'mountain', title: 'Hochkönig Card', text: HOCHKOENIG_CARD },
@@ -174,18 +177,19 @@ G.defaultProperties = () => [
   {
     id: 'alm',
     name: 'Nösslau Alm',
-    subtitle: 'Selbstversorger-Almhütte in Dienten am Hochkönig',
+    subtitle: 'Selbstversorgerhütte für 10–15 Personen · Dienten am Hochkönig',
     phone: '+43 6584 7765',
     whatsapp: '',
     email: 'stegerbauer@sbg.at',
     website: 'https://www.almhuette-hochkoenig.at/',
     deliveryText: 'Brötchenservice in der Wintersaison – wir bringen euch das Gebäck in der Früh zur Hütte.',
     sections: [
-      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr auf der **Nösslau Alm** seid!\n\nEure Hütte liegt auf rund **1.220 m** etwas außerhalb von Dienten am Hochkönig – in ruhiger, sonniger Alleinlage mit Aussicht. Genießt die Zeit auf der Alm!\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
+      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr auf der **Nösslau Alm** seid!\n\nEure Hütte liegt auf rund **1.220 m** etwas außerhalb von Dienten am Hochkönig – in ruhiger, sonniger Alleinlage mit Aussicht.\n\nUnsere urige Alm für Selbstversorger ist ideal für Familien, Freunde oder Vereine (10 bis 15 Personen) – Natur pur und unvergessliche Momente in den Bergen.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
       { id: 'anreise', icon: 'key', title: 'An- & Abreise', text: '- Anreise ab **[Uhrzeit eintragen]**\n- Abreise bis **[Uhrzeit eintragen]**\n- In der Hauptsaison wird von **Samstag bis Samstag** vermietet\n- Schlüssel: [hier eintragen]\n\n**Im Winter** braucht ihr ein **Allradfahrzeug und Schneeketten**. Bei schwierigen Schneeverhältnissen gibt es einen Parkplatz direkt an der Hütte.' },
       { id: 'huette', icon: 'home', title: 'Die Hütte', text: '- **5 Schlafzimmer** (3 Doppelzimmer, eines davon mit Stockbett, und 2 Mehrbettzimmer)\n- Große, gemütliche **Stube** mit Kachelofen\n- Küche mit E-Herd und Backrohr, **Holzherd**, Geschirrspüler, Mikrowelle, Kaffeemaschine, Toaster, Wasserkocher und Kühlschrank\n- **3 WC, 2 Duschen und Sauna**\n- Fernseher und Radio\n- Terrasse und Balkon\n- Trockenraum für Kleidung und Schuhe\n- Vorratskeller mit Gefriertruhe' },
       { id: 'heizen', icon: 'info', title: 'Heizen mit Holz', text: 'Die Hütte heizt ihr selbst mit Holz – das Holz stellen wir euch zur Verfügung. Es liegt [hier eintragen].\n\n- Ofentüren nach dem Nachlegen immer schließen\n- Asche nur ganz ausgekühlt in den Aschekübel – nie in den Müll\n- Bitte vor dem Schlafengehen kein Holz mehr nachlegen' },
       { id: 'kuehe', icon: 'egg', title: 'Kühe auf der Alm', text: 'Von Frühjahr bis Herbst weiden **Mutterkühe mit ihren Kälbern** rund um die Hütte.\n\n- Bitte haltet Abstand und geht nicht zwischen Kuh und Kalb\n- Hunde an die kurze Leine\n- Weidetore nach dem Durchgehen wieder schließen' },
+      fleisch('Bestes Fleisch von unseren eigenen Tieren vom **Bio-Bauernhof Stegerbauer** in Maria Alm – ideal zum Grillen und Kochen auf der Hütte.'),
       { id: 'card', icon: 'mountain', title: 'Hochkönig Card', text: HOCHKOENIG_CARD },
       { id: 'tipps', icon: 'map', title: 'Ausflugstipps', text: 'Rund um Dienten gibt es viele Wanderwege mit herrlicher Aussicht auf den Hochkönig.\n\n- [Wanderung – Gehzeit, Einkehr]\n- [Hütten-Tipp]\n- [Ausflug bei Schlechtwetter]\n\nWetter: https://www.almhuette-hochkoenig.at/wetter-in-maria-alm' },
       { id: 'muell', icon: 'recycle', title: 'Müll & Recycling', text: MUELL },
@@ -195,18 +199,19 @@ G.defaultProperties = () => [
   {
     id: 'schoberhof',
     name: 'Selbstversorgerhaus Schoberhof',
-    subtitle: 'Gruppenhaus in Dienten am Hochkönig',
+    subtitle: 'Selbstversorgerhaus für 15–23 Personen · Dienten am Hochkönig',
     phone: '+43 6584 7765',
     whatsapp: '',
     email: 'stegerbauer@sbg.at',
     website: 'https://www.ferienhaus-dienten.at/',
     deliveryText: 'Brötchenservice in der Wintersaison – wir bringen euch das Gebäck in der Früh zum Haus.',
     sections: [
-      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr im **Selbstversorgerhaus Schoberhof** seid!\n\nDas Haus liegt auf rund **1.100 m**, etwa 3 km von Dienten am Hochkönig – ruhig und sonnig, mitten in Wiesen und Wäldern. Hier können die Kinder frei herumtollen.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
+      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr im **Selbstversorgerhaus Schoberhof** seid!\n\nDas Haus liegt auf rund **1.100 m**, etwa 3 km von Dienten am Hochkönig – ruhig und sonnig, mitten in Wiesen und Wäldern. Hier können die Kinder frei herumtollen.\n\nViel Platz für gemeinsame Zeit (15 bis 23 Personen) – perfekt für Gruppen, Erholung und ruhige Momente.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
       { id: 'anreise', icon: 'key', title: 'An- & Abreise', text: '- Adresse: **Lindlweg 5, 5761 Maria Alm**\n- Anreise ab **[Uhrzeit eintragen]**\n- Abreise bis **[Uhrzeit eintragen]**\n- Parkplätze direkt am Hof – auch bei viel Schnee\n- Schlüssel: [hier eintragen]\n\n**Im Winter** braucht ihr ein **Allradfahrzeug und Schneeketten**.' },
       { id: 'haus', icon: 'home', title: 'Das Haus', text: '- **10 Schlafzimmer**\n- Große **Bauernstube** mit Kachelofen, Fernseher und **WLAN** (Name und Passwort stehen oben)\n- Küche mit Geschirrspüler, Mikrowelle, Kaffeemaschine, Kühlschrank und Gefrierschrank\n- **6 Duschen und 8 WC**\n- **Waschmaschine und Wäschetrockner**\n- **Sauna**\n- Balkon und 2 Terrassen' },
       { id: 'fischteich', icon: 'info', title: 'Fischteich', text: 'Im hauseigenen Fischteich könnt ihr **Forellen fangen**.\n\n[Angelausrüstung, Preis pro Fisch und Regeln hier eintragen]' },
       { id: 'essen', icon: 'bread', title: 'Essen & Feiern', text: '- Gasthäuser mit traditioneller Küche sind nicht weit\n- **Partyservice** auf Anfrage – sprecht uns einfach an' },
+      fleisch('Bestes Fleisch von unseren eigenen Tieren vom **Bio-Bauernhof Stegerbauer** in Maria Alm – ideal für die große Runde.'),
       { id: 'hausregeln', icon: 'rules', title: 'Hausregeln', text: '- Nachtruhe von 22:00 bis 7:00 Uhr\n- Rauchen bitte nur im Freien\n- [weitere Regeln hier eintragen]' },
       { id: 'card', icon: 'mountain', title: 'Hochkönig Card', text: HOCHKOENIG_CARD },
       { id: 'tipps', icon: 'map', title: 'Ausflugstipps', text: '- Skigebiet Hochkönig – Lifte in Dienten ganz in der Nähe\n- Wandern rund um Dienten und Maria Alm\n- [eigener Tipp]\n\nWetter: https://www.ferienhaus-dienten.at/wetter-in-maria-alm' },
@@ -223,12 +228,32 @@ G.defaultSite = () => ({
   bakeryName: '',
   bakeryPhone: '',
   properties: G.defaultProperties(),
+  contentVersion: 2,
   products: [
-    { id: 'semmel', name: 'Semmel', price: 0.6, group: 'baecker', active: true },
-    { id: 'kornspitz', name: 'Kornspitz', price: 1.0, group: 'baecker', active: true },
-    { id: 'vollkorn', name: 'Vollkornweckerl', price: 0.9, group: 'baecker', active: true },
-    { id: 'croissant', name: 'Croissant', price: 1.4, group: 'baecker', active: true },
-    { id: 'brot', name: 'Bauernbrot (½ Laib)', price: 2.9, group: 'baecker', active: true },
+    // Gebäck
+    { id: 'vollkorn', name: 'Vollkornweckerl', price: 1.8, group: 'baecker', cat: 'Gebäck', active: true },
+    { id: 'handstangerl', name: 'Handstangerl', price: 1.6, group: 'baecker', cat: 'Gebäck', active: true },
+    { id: 'laugenstangerl', name: 'Laugenstangerl', price: 1.6, group: 'baecker', cat: 'Gebäck', active: true },
+    { id: 'milchkipferl', name: 'Milchkipferl', price: 1.6, group: 'baecker', cat: 'Gebäck', active: true },
+    { id: 'brezen', name: 'Brezen', price: 1.6, group: 'baecker', cat: 'Gebäck', active: true },
+    { id: 'semmel', name: 'Semmel', price: 0.8, group: 'baecker', cat: 'Gebäck', active: true },
+    { id: 'dinkelhandsemmel', name: 'Bio-Dinkelhandsemmel', price: 1.8, group: 'baecker', cat: 'Gebäck', active: true },
+    // Brot
+    { id: 'holzofenbrot', name: 'Holzofenbrot', price: 8, group: 'baecker', cat: 'Brot', active: true },
+    { id: 'almwiesenbrot', name: 'Almwiesenbrot', price: 6, group: 'baecker', cat: 'Brot', active: true },
+    { id: 'hausbrot', name: 'Hausbrot', price: 5, group: 'baecker', cat: 'Brot', active: true },
+    { id: 'dinkelbrot', name: 'Dinkelbrot', price: 6, group: 'baecker', cat: 'Brot', active: true },
+    { id: 'wurzelbrot', name: 'Wurzelbrot', price: 5, group: 'baecker', cat: 'Brot', active: true },
+    { id: 'bauernwecken', name: 'Bauernwecken', price: 5, group: 'baecker', cat: 'Brot', active: true },
+    { id: 'baguette', name: 'Baguette', price: 0, group: 'baecker', cat: 'Brot', active: false },
+    // Süßes & Feines
+    { id: 'croissant', name: 'Croissant', price: 2.2, group: 'baecker', cat: 'Süßes & Feines', active: true },
+    { id: 'nussnugatcroissant', name: 'Nussnugat-Croissant', price: 3.6, group: 'baecker', cat: 'Süßes & Feines', active: true },
+    { id: 'mohnstangerl', name: 'Mohnstangerl', price: 3, group: 'baecker', cat: 'Süßes & Feines', active: true },
+    { id: 'nussstangerl', name: 'Nussstangerl', price: 3, group: 'baecker', cat: 'Süßes & Feines', active: true },
+    { id: 'topfengolatsche', name: 'Topfengolatsche', price: 3.6, group: 'baecker', cat: 'Süßes & Feines', active: true },
+    { id: 'krapfen', name: 'Krapfen (nur im Winter)', price: 3, group: 'baecker', cat: 'Süßes & Feines', active: true },
+    // Vom Hof
     { id: 'eier', name: 'Bio-Eier von unseren Hühnern (6 Stück)', price: 3.0, group: 'hof', active: true },
     { id: 'marmelade', name: 'Hausgemachte Marmelade', price: 4.5, group: 'hof', active: false },
   ],
@@ -242,6 +267,7 @@ G.defaultUnits = () => [
   { name: 'Nösslau Alm', property: 'alm', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
   { name: 'Selbstversorgerhaus Schoberhof', property: 'schoberhof', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
 ];
+G.BAKERY_CATS = ['Gebäck', 'Brot', 'Süßes & Feines'];
 G.newUnitId = (name) => `${G.slug(name)}-${G.uid(6)}`;
 G.mergeSite = (s) => {
   const base = G.defaultSite();
@@ -257,6 +283,10 @@ G.propertyOf = (site, unit) => {
 // Umstellung von der alten Version (ein gemeinsamer Hof) auf drei Betriebe
 const LEGACY_SECTIONS = [{"id":"willkommen","icon":"home","title":"Willkommen","text":"Schön, dass ihr bei uns seid! Hier findet ihr alles Wichtige für euren Aufenthalt.\n\nWenn etwas fehlt oder kaputt ist, meldet euch bitte jederzeit – wir helfen gerne."},{"id":"anreise","icon":"key","title":"An- & Abreise","text":"- Anreise ab **15:00 Uhr**\n- Abreise bis **10:00 Uhr**\n- Bitte lasst den Schlüssel bei der Abreise in der Wohnung stecken.\n- Parkplätze: [hier eintragen]"},{"id":"hausregeln","icon":"rules","title":"Hausregeln","text":"- Nachtruhe von 22:00 bis 7:00 Uhr\n- Rauchen bitte nur im Freien\n- Haustiere nur nach Absprache\n- Wir sind ein Arbeitsbetrieb: Bitte lasst Kinder nicht unbeaufsichtigt beim Stall, bei Maschinen oder auf dem Hofplatz spielen."},{"id":"muell","icon":"recycle","title":"Müll & Recycling","text":"Die Mülltonnen findet ihr [hier eintragen].\n\n- **Restmüll** – schwarze Tonne\n- **Bio** – braune Tonne\n- **Papier** – rote Tonne\n- **Plastik & Metall** – gelber Sack\n- **Glas** – bitte in den Container [hier eintragen]"},{"id":"notfall","icon":"sos","title":"Notfall & wichtige Nummern","text":"- **112** – Euro-Notruf\n- **144** – Rettung\n- **122** – Feuerwehr\n- **133** – Polizei\n- **140** – Bergrettung / Alpinnotruf\n- **141** – Ärztenotdienst\n- **1450** – Gesundheitsberatung\n\nNächster Arzt: [hier eintragen]\nNächste Apotheke: [hier eintragen]"},{"id":"tipps","icon":"mountain","title":"Ausflugstipps","text":"Unsere Lieblingsziele in der Umgebung:\n\n- [Wanderung – Gehzeit, Einkehr]\n- [Badesee / Hallenbad]\n- [Ausflug bei Schlechtwetter]\n- [Restaurant-Tipp]"},{"id":"hof","icon":"egg","title":"Vom Hof","text":"Frische Milch, Eier und hausgemachte Marmelade bekommt ihr direkt bei uns – einfach mit der Frühstücksbestellung dazu bestellen oder fragen."}];
 const LEGACY_PRODUCTS = [{"id":"semmel","name":"Semmel","price":0.6,"group":"baecker","active":true},{"id":"kornspitz","name":"Kornspitz","price":1.0,"group":"baecker","active":true},{"id":"vollkorn","name":"Vollkornweckerl","price":0.9,"group":"baecker","active":true},{"id":"croissant","name":"Croissant","price":1.4,"group":"baecker","active":true},{"id":"brot","name":"Bauernbrot (½ Laib)","price":2.9,"group":"baecker","active":true},{"id":"milch","name":"Frische Milch vom Hof (1 l)","price":1.5,"group":"hof","active":true},{"id":"eier","name":"Eier vom Hof (6 Stück)","price":3.0,"group":"hof","active":true},{"id":"butter","name":"Butter (250 g)","price":3.5,"group":"hof","active":true},{"id":"marmelade","name":"Hausgemachte Marmelade","price":4.5,"group":"hof","active":true}];
+// Firestore liefert Felder evtl. in anderer Reihenfolge – darum Feld für Feld vergleichen
+const secKey = (x) => [x.id, x.icon, x.title, x.text];
+const sameSection = (a, b) => !!a && !!b && JSON.stringify(secKey(a)) === JSON.stringify(secKey(b));
+const sameSections = (a, b) => Array.isArray(a) && a.length === b.length && a.every((x, i) => sameSection(x, b[i]));
 const sameProducts = (a, b) => JSON.stringify((a || []).map((p) => [p.id, p.name, p.price, p.group, p.active !== false])) === JSON.stringify(b.map((p) => [p.id, p.name, p.price, p.group, p.active !== false]));
 const LEGACY_RENAME = {
   'Ferienwohnung 1': ['Ferienwohnung Schwalbenwand', 'stegerbauer'],
@@ -269,7 +299,7 @@ G.migrateSite = (old) => {
   const fresh = G.defaultSite();
   const props = fresh.properties;
   // eigene, schon geänderte Texte nicht verwerfen
-  if (Array.isArray(old.sections) && JSON.stringify(old.sections) !== JSON.stringify(LEGACY_SECTIONS)) {
+  if (Array.isArray(old.sections) && !sameSections(old.sections, LEGACY_SECTIONS)) {
     props[0].sections = old.sections;
   }
   ['phone', 'whatsapp', 'email'].forEach((k) => { if (old[k]) props[0][k] = old[k]; });
@@ -297,6 +327,37 @@ G.migrateUnits = (units) => {
   });
   const adds = G.defaultUnits().filter((d) => !names.has(d.name) && changes.length);
   return { changes, adds };
+};
+
+// Update der Startinhalte (Version 2: Brötchenservice-Preisliste, Stellplatz-Preise, Fleisch, Personenzahlen).
+// Nur was noch genau dem alten Vorschlag entspricht, wird ersetzt – eigene Änderungen bleiben.
+const V1 = {"props":{"stegerbauer":{"fields":{"subtitle":"Urlaub am Bauernhof in Maria Alm"},"sections":{"willkommen":{"id":"willkommen","icon":"home","title":"Herzlich willkommen","text":"Schön, dass ihr bei uns am **Bio-Bauernhof Stegerbauer** in Maria Alm seid!\n\nHier findet ihr alles Wichtige für euren Urlaub. Wenn etwas fehlt oder nicht passt, meldet euch jederzeit bei uns – wir helfen gerne.\n\nEure Familie Herzog"},"wohnung":{"id":"wohnung","icon":"home","title":"Eure Ferienwohnung","text":"- **WLAN** gratis – Name und Passwort stehen oben\n- Kabel-TV, Safe\n- Küche mit Herd, Geschirrspüler, Mikrowelle, Kühlschrank mit Gefrierfach, Kaffeemaschine und Wasserkocher\n- Balkon\n- Für die Kleinsten: **Babybett, Wickelauflage und Babybadewanne** – sagt uns einfach Bescheid"},"stellplatz":{"id":"stellplatz","icon":"car","title":"Wohnmobil-Stellplatz","text":"- Strom, Frischwasser und Entsorgung direkt am Platz\n- Ganzjährig geöffnet\n- Ins Ortszentrum sind es ca. 10 Minuten\n- Frische Semmeln könnt ihr hier in der App für den nächsten Morgen bestellen"}}},"alm":{"fields":{"subtitle":"Selbstversorger-Almhütte in Dienten am Hochkönig"},"sections":{"willkommen":{"id":"willkommen","icon":"home","title":"Herzlich willkommen","text":"Schön, dass ihr auf der **Nösslau Alm** seid!\n\nEure Hütte liegt auf rund **1.220 m** etwas außerhalb von Dienten am Hochkönig – in ruhiger, sonniger Alleinlage mit Aussicht. Genießt die Zeit auf der Alm!\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog"}}},"schoberhof":{"fields":{"subtitle":"Gruppenhaus in Dienten am Hochkönig"},"sections":{"willkommen":{"id":"willkommen","icon":"home","title":"Herzlich willkommen","text":"Schön, dass ihr im **Selbstversorgerhaus Schoberhof** seid!\n\nDas Haus liegt auf rund **1.100 m**, etwa 3 km von Dienten am Hochkönig – ruhig und sonnig, mitten in Wiesen und Wäldern. Hier können die Kinder frei herumtollen.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog"}}}},"products":[{"id":"semmel","name":"Semmel","price":0.6,"group":"baecker","active":true},{"id":"kornspitz","name":"Kornspitz","price":1,"group":"baecker","active":true},{"id":"vollkorn","name":"Vollkornweckerl","price":0.9,"group":"baecker","active":true},{"id":"croissant","name":"Croissant","price":1.4,"group":"baecker","active":true},{"id":"brot","name":"Bauernbrot (½ Laib)","price":2.9,"group":"baecker","active":true},{"id":"eier","name":"Bio-Eier von unseren Hühnern (6 Stück)","price":3,"group":"hof","active":true},{"id":"marmelade","name":"Hausgemachte Marmelade","price":4.5,"group":"hof","active":false}]};
+const NEW_IN_V2 = ['fleisch'];
+G.CONTENT_VERSION = 2;
+G.upgradeSite = (site) => {
+  if (!site || !Array.isArray(site.properties) || !site.properties.length || (site.contentVersion || 1) >= G.CONTENT_VERSION) return null;
+  const fresh = G.defaultSite();
+  const properties = site.properties.map((p) => {
+    const f = fresh.properties.find((x) => x.id === p.id);
+    const old = V1.props[p.id];
+    if (!f || !old) return p;
+    const np = { ...p };
+    Object.entries(old.fields).forEach(([k, v]) => { if ((p[k] || '') === (v || '')) np[k] = f[k]; });
+    let secs = Array.isArray(p.sections) ? p.sections : [];
+    // erste Umstellung hat bei Firebase evtl. die alten Standardtexte übernommen
+    if (p.id === 'stegerbauer' && sameSections(secs, LEGACY_SECTIONS)) secs = f.sections.filter((x) => !NEW_IN_V2.includes(x.id));
+    secs = secs.map((x) => (old.sections[x.id] && sameSection(x, old.sections[x.id]) ? f.sections.find((y) => y.id === x.id) : x));
+    f.sections.forEach((fs, i) => {
+      if (!NEW_IN_V2.includes(fs.id) || secs.some((x) => x.id === fs.id)) return;
+      const prev = i > 0 ? secs.findIndex((x) => x.id === f.sections[i - 1].id) : -1;
+      secs = [...secs.slice(0, prev + 1 || secs.length), fs, ...secs.slice(prev + 1 || secs.length)];
+    });
+    np.sections = secs;
+    return np;
+  });
+  const prods = site.products || [];
+  const products = !prods.length || sameProducts(prods, V1.products) || sameProducts(prods, LEGACY_PRODUCTS) ? fresh.products : prods;
+  return { ...site, properties, products, contentVersion: G.CONTENT_VERSION };
 };
 
 // ---------- Datenspeicher ----------

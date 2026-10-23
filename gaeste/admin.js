@@ -312,7 +312,7 @@ function settingsHtml() {
       <label class="toggle"><span>Frühstücksbestellung aktiv</span><input type="checkbox" id="sOn" ${d.breakfast !== false ? 'checked' : ''}></label>
       <label class="field"><span>Bestellschluss am Vortag</span><select class="input" id="sCut">
         ${Array.from({ length: 13 }, (_, i) => i + 10).map((h) => `<option value="${h}" ${+d.cutoffHour === h ? 'selected' : ''}>${h}:00 Uhr</option>`).join('')}</select></label>
-      <p class="hint" style="margin:0">Den Hinweis zur Lieferung und die Kontaktdaten stellst du pro Betrieb unter „Gästemappe“ ein. Ob eine einzelne Unterkunft bestellen kann, unter „Unterkünfte“.</p>
+      <p class="hint" style="margin:0">Produkte ohne Preis bitte nicht als „bestellbar“ markieren. Den Hinweis zur Lieferung und die Kontaktdaten stellst du pro Betrieb unter „Gästemappe“ ein. Ob eine einzelne Unterkunft bestellen kann, unter „Unterkünfte“.</p>
     </div>
     <div class="section-title">Produkte & Preise</div>
     <div class="panel" id="prodList">
@@ -324,6 +324,8 @@ function settingsHtml() {
           <label><input type="radio" name="pg${i}" data-pgroup="${i}" value="baecker" ${(p.group || 'baecker') === 'baecker' ? 'checked' : ''}>Bäcker</label>
           <label><input type="radio" name="pg${i}" data-pgroup="${i}" value="hof" ${p.group === 'hof' ? 'checked' : ''}>vom Hof</label>
           <label><input type="checkbox" data-pact="${i}" ${p.active !== false ? 'checked' : ''}>bestellbar</label>
+          ${(p.group || 'baecker') === 'baecker' ? `<select class="input" data-pcat="${i}" style="width:auto;padding:4px 8px;min-height:0">
+            ${['', ...G.BAKERY_CATS].map((c) => `<option value="${esc(c)}" ${(p.cat || '') === c ? 'selected' : ''}>${c ? esc(c) : 'ohne Kategorie'}</option>`).join('')}</select>` : ''}
         </div></div>`).join('')}
       <button class="btn small" id="pAdd">${ICON.plus} Produkt</button>
     </div>
@@ -346,7 +348,8 @@ function bindSettings(v) {
   const rer = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
   $$('[data-pname]', v).forEach((el) => (el.oninput = () => { d.products[+el.dataset.pname].name = el.value; }));
   $$('[data-pprice]', v).forEach((el) => (el.oninput = () => { d.products[+el.dataset.pprice].price = G.num(el.value) || 0; }));
-  $$('[data-pgroup]', v).forEach((el) => (el.onchange = () => { d.products[+el.dataset.pgroup].group = el.value; }));
+  $$('[data-pgroup]', v).forEach((el) => (el.onchange = () => { d.products[+el.dataset.pgroup].group = el.value; rer(); }));
+  $$('[data-pcat]', v).forEach((el) => (el.onchange = () => { d.products[+el.dataset.pcat].cat = el.value; }));
   $$('[data-pact]', v).forEach((el) => (el.onchange = () => { d.products[+el.dataset.pact].active = el.checked; }));
   $$('[data-pdel]', v).forEach((b) => (b.onclick = () => { d.products.splice(+b.dataset.pdel, 1); rer(); }));
   $('#pAdd', v).onclick = () => { d.products.push({ id: G.uid(6), name: '', price: 0, group: 'baecker', active: true }); rer(); };
@@ -413,6 +416,9 @@ function maybeSeed() {
     changes.forEach(([id, data]) => store.saveUnit(id, data));
     adds.forEach((u) => store.saveUnit(G.newUnitId(u.name), u));
     toast('Umgestellt auf Stegerbauer, Nösslau Alm und Schoberhof');
+  } else {
+    const up = G.upgradeSite(site);
+    if (up) { store.saveSite(up); site = up; toast('Gästemappe und Preisliste aktualisiert'); }
   }
 }
 
