@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// Gemeinsame Regeln für ALLE Hof-Apps (Maschinen, Gäste, Hof-Karte) in einem Firebase-Projekt.
+// Diese Datei ersetzt die älteren firestore.rules der anderen Apps.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Wer am Hof Zugriff hat.
+    // Neue Person: E-Mail hier ergänzen UND in Firebase unter Authentication › Nutzer anlegen.
+    function istHofMitglied() {
+      return request.auth != null
+        && request.auth.token.email in [
+          'deine.email@gmail.com'
+          // , 'weitere.person@beispiel.at'
+        ];
+    }
+
+    // ---------- Maschinen-App ----------
+    match /machines/{id} { allow read, write: if istHofMitglied(); }
+    match /entries/{id}  { allow read, write: if istHofMitglied(); }
+
+    // ---------- Hof-Karte ----------
+    match /features/{id} { allow read, write: if istHofMitglied(); }
+    match /photos/{id}   { allow read, write: if istHofMitglied() && (request.resource == null || request.resource.data.data.size() < 900000); }
+    match /hofkarte/{id} { allow read, write: if istHofMitglied(); }
+
+    // ---------- Gäste-App ----------
+    match /site/{doc} {
+      allow read: if true;
+      allow write: if istHofMitglied();
+    }
+    match /units/{id} {
+      allow get: if true;
+      allow list, write: if istHofMitglied();
+    }
+    match /orders/{id} {
+      allow get: if true;
+      allow list, delete: if istHofMitglied();
+      allow create: if gueltigeBestellung();
+      allow update: if istHofMitglied() || gastStorniert();
+    }
+
+    function gueltigeBestellung() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['unitId', 'unitName', 'spot', 'name', 'date', 'items', 'note', 'total', 'status', 'deadline', 'createdAt'])
+        && d.status == 'offen'
+        && d.deadline is timestamp
+        && request.time < d.deadline
+        && d.deadline < request.time + duration.value(8, 'd')
+        && d.createdAt == request.time
+        && d.date is string && d.date.size() == 10
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+        && d.note is string && d.note.size() <= 500
+        && d.spot is string && d.spot.size() <= 20
+        && d.items is list && d.items.size() > 0 && d.items.size() <= 30
+        && d.total is number && d.total >= 0 && d.total < 1000
+        && exists(/databases/$(database)/documents/units/$(d.unitId));
+    }
+
+    function gastStorniert() {
+      return request.time < resource.data.deadline
+        && resource.data.status == 'offen'
+        && request.resource.data.status == 'storniert'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+    }
+  }
+}

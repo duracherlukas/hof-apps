@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gästemappe</title>
+<meta name="description" content="Digitale Gästemappe und Frühstücksbestellung">
+<meta name="theme-color" content="#f6f3ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111513" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap" id="root">
+  <div class="center" id="loading"><div class="spinner"></div></div>
+</div>
+<script>
+  setTimeout(function () {
+    var l = document.getElementById('loading');
+    if (l) l.innerHTML = '<div class="err-box">Die Seite lädt gerade nicht. Bitte prüfe deine Internetverbindung und lade neu.</div>';
+  }, 10000);
+</script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script src="guest.js"></script>
+</body>
+</html>
