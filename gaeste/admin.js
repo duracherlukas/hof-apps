@@ -17,6 +17,10 @@ const S = () => G.mergeSite(site);
 const cutoff = () => (Number.isFinite(+S().cutoffHour) ? +S().cutoffHour : 17);
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const unitName = (id) => (units.find((u) => u.id === id) || {}).name;
+const unitById = (id) => units.find((u) => u.id === id);
+const propOfUnitId = (id) => G.propertyOf(S(), unitById(id));
+const propIndex = (pid) => { const i = (S().properties || []).findIndex((p) => p.id === pid); return i < 0 ? 99 : i; };
+let contentProp = 0;
 const guestUrl = (id) => new URL(`index.html${id ? `?u=${encodeURIComponent(id)}` : ''}`, location.href).href;
 
 const TABS = [
@@ -103,12 +107,12 @@ function ordersHtml() {
         </div></div>` : ''}
       ${hof.length ? `<div class="card"><h2>${ICON.egg} Vom Hof herrichten</h2>${tbl(hof)}</div>` : ''}
       <div class="section-title">Verteilliste</div>
-      <div class="list">${active.sort((a, b) => (a.unitName || '').localeCompare(b.unitName || '', 'de') || String(a.spot).localeCompare(String(b.spot), 'de', { numeric: true }))
+      <div class="list">${active.sort((a, b) => propIndex(propOfUnitId(a.unitId).id) - propIndex(propOfUnitId(b.unitId).id) || (a.unitName || '').localeCompare(b.unitName || '', 'de') || String(a.spot).localeCompare(String(b.spot), 'de', { numeric: true }))
         .map((o) => `<div class="order"><label class="deliv">
           <input type="checkbox" data-deliv="${esc(o.id)}" ${o.status === 'geliefert' ? 'checked' : ''} aria-label="geliefert">
           <div class="info"><div class="head"><b>${esc(o.unitName || unitName(o.unitId) || '?')}${o.spot ? ` · Platz ${esc(o.spot)}` : ''}</b><span class="num">${money(G.orderTotal(o))}</span></div>
           <div class="items">${esc(G.orderItemsText(o))}</div>
-          <small>${esc(o.name)}${o.note ? ` · „${esc(o.note)}“` : ''}</small></div></label></div>`).join('')}</div>
+          <small>${esc(propOfUnitId(o.unitId).name || '')} · ${esc(o.name)}${o.note ? ` · „${esc(o.note)}“` : ''}</small></div></label></div>`).join('')}</div>
       <p class="hint">Häkchen setzen, wenn geliefert – die Gäste sehen das in ihrer Gästemappe.</p>`
       : `<div class="card" style="text-align:center"><p class="muted" style="margin:8px 0">Noch keine Bestellungen für diesen Tag.</p></div>`}
     ${cancelled.length ? `<div class="section-title">Storniert</div><div class="list">${cancelled.map((o) => `<div class="order storniert">
@@ -159,53 +163,76 @@ function bindBilling(v) {
 const ICON_NAMES = { home: 'Haus', key: 'Schlüssel', wifi: 'WLAN', rules: 'Regeln', recycle: 'Müll', sos: 'Notfall', map: 'Karte', mountain: 'Berge', egg: 'Hof', bread: 'Brot', car: 'Auto', phone: 'Telefon', info: 'Info', book: 'Buch' };
 function contentHtml() {
   if (!draft) draft = clone(S());
+  const props = draft.properties;
+  if (contentProp >= props.length) contentProp = 0;
+  const P = props[contentProp];
+  const firstUnit = units.find((u) => u.property === P.id);
   return `
+    <div class="seg" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${props.map((p, i) => `<button class="btn small ${i === contentProp ? 'primary' : ''}" style="margin:0" data-prop="${i}">${esc(p.name)}</button>`).join('')}</div>
     <div class="panel">
-      <label class="field"><span>Name eures Hofs</span><input class="input" id="cName" value="${esc(draft.hofName)}"></label>
-      <label class="field" style="margin:0"><span>Untertitel</span><input class="input" id="cSub" value="${esc(draft.subtitle)}"></label>
+      <label class="field"><span>Name</span><input class="input" id="cName" value="${esc(P.name)}"></label>
+      <label class="field"><span>Untertitel</span><input class="input" id="cSub" value="${esc(P.subtitle || '')}"></label>
+      <div class="grid2">
+        <label class="field"><span>Telefon</span><input class="input" id="cPhone" inputmode="tel" value="${esc(P.phone || '')}" placeholder="+43 …"></label>
+        <label class="field"><span>WhatsApp</span><input class="input" id="cWa" inputmode="tel" value="${esc(P.whatsapp || '')}" placeholder="+43 …"></label>
+        <label class="field"><span>E-Mail</span><input class="input" id="cMail" type="email" value="${esc(P.email || '')}"></label>
+        <label class="field"><span>Webseite</span><input class="input" id="cWeb" type="url" value="${esc(P.website || '')}"></label>
+      </div>
+      <label class="field" style="margin:0"><span>Hinweis zum Brötchenservice</span><input class="input" id="cDeliv" value="${esc(P.deliveryText || '')}"></label>
     </div>
-    <div class="section-title">Abschnitte</div>
-    <p class="hint" style="margin-top:-4px">Formatierung: <b>**fett**</b>, Zeilen mit „- “ werden Aufzählungen, Telefonnummern und Links werden automatisch anklickbar.</p>
-    <div id="secList">${draft.sections.map((sec, i) => `<div class="sec-edit">
+    <div class="section-title">Abschnitte der Gästemappe – ${esc(P.name)}</div>
+    <p class="hint" style="margin-top:-4px">Formatierung: <b>**fett**</b>, Zeilen mit „- “ werden Aufzählungen, Telefonnummern und Links werden automatisch anklickbar. Überall wo <b>[hier eintragen]</b> steht, fehlt noch eine Info.</p>
+    <div id="secList">${P.sections.map((sec, i) => `<div class="sec-edit">
       <div class="row">
         <select class="input" data-sicon="${i}" style="flex:0 0 112px">${G.SECTION_ICONS.map((k) => `<option value="${k}" ${k === sec.icon ? 'selected' : ''}>${ICON_NAMES[k] || k}</option>`).join('')}</select>
         <input class="input" data-stitle="${i}" value="${esc(sec.title)}" placeholder="Überschrift">
         <div class="tools">
           <button class="icon-btn" data-sup="${i}" aria-label="nach oben" ${i ? '' : 'disabled'}>${ICON.up}</button>
-          <button class="icon-btn" data-sdown="${i}" aria-label="nach unten" ${i < draft.sections.length - 1 ? '' : 'disabled'}>${ICON.down}</button>
+          <button class="icon-btn" data-sdown="${i}" aria-label="nach unten" ${i < P.sections.length - 1 ? '' : 'disabled'}>${ICON.down}</button>
           <button class="icon-btn" data-sdel="${i}" aria-label="löschen">${ICON.trash}</button>
         </div>
       </div>
-      <textarea class="input" data-stext="${i}" rows="6">${esc(sec.text)}</textarea>
+      <textarea class="input" data-stext="${i}" rows="7">${esc(sec.text)}</textarea>
     </div>`).join('')}</div>
     <button class="btn" id="cAdd">${ICON.plus} Abschnitt hinzufügen</button>
     <button class="btn primary" id="cSave">Speichern</button>
-    <a class="btn" href="${esc(guestUrl(units[0] && units[0].id))}" target="_blank" rel="noopener">Gästeseite ansehen</a>`;
+    ${firstUnit ? `<a class="btn" href="${esc(guestUrl(firstUnit.id))}" target="_blank" rel="noopener">So sehen es die Gäste</a>` : ''}`;
 }
 function bindContent(v) {
-  $('#cName', v).oninput = (e) => { draft.hofName = e.target.value; };
-  $('#cSub', v).oninput = (e) => { draft.subtitle = e.target.value; };
+  const P = draft.properties[contentProp];
   const rer = () => { const y = window.scrollY; render(); window.scrollTo(0, y); };
-  $$('[data-stitle]', v).forEach((el) => (el.oninput = () => { draft.sections[+el.dataset.stitle].title = el.value; }));
-  $$('[data-stext]', v).forEach((el) => (el.oninput = () => { draft.sections[+el.dataset.stext].text = el.value; }));
-  $$('[data-sicon]', v).forEach((el) => (el.onchange = () => { draft.sections[+el.dataset.sicon].icon = el.value; }));
-  $$('[data-sup]', v).forEach((b) => (b.onclick = () => { const i = +b.dataset.sup; [draft.sections[i - 1], draft.sections[i]] = [draft.sections[i], draft.sections[i - 1]]; rer(); }));
-  $$('[data-sdown]', v).forEach((b) => (b.onclick = () => { const i = +b.dataset.sdown; [draft.sections[i + 1], draft.sections[i]] = [draft.sections[i], draft.sections[i + 1]]; rer(); }));
-  $$('[data-sdel]', v).forEach((b) => (b.onclick = () => { const i = +b.dataset.sdel; if (confirm(`Abschnitt „${draft.sections[i].title}“ löschen?`)) { draft.sections.splice(i, 1); rer(); } }));
-  $('#cAdd', v).onclick = () => { draft.sections.push({ id: G.uid(6), icon: 'info', title: 'Neuer Abschnitt', text: '' }); rer(); setTimeout(() => { const t = $$('[data-stitle]').pop(); if (t) { t.focus(); t.select(); } }, 50); };
+  $$('[data-prop]', v).forEach((b) => (b.onclick = () => { contentProp = +b.dataset.prop; rer(); }));
+  const f = { cName: 'name', cSub: 'subtitle', cPhone: 'phone', cWa: 'whatsapp', cMail: 'email', cWeb: 'website', cDeliv: 'deliveryText' };
+  Object.entries(f).forEach(([id, key]) => { $(`#${id}`, v).oninput = (e) => { P[key] = e.target.value; }; });
+  $$('[data-stitle]', v).forEach((el) => (el.oninput = () => { P.sections[+el.dataset.stitle].title = el.value; }));
+  $$('[data-stext]', v).forEach((el) => (el.oninput = () => { P.sections[+el.dataset.stext].text = el.value; }));
+  $$('[data-sicon]', v).forEach((el) => (el.onchange = () => { P.sections[+el.dataset.sicon].icon = el.value; }));
+  $$('[data-sup]', v).forEach((b) => (b.onclick = () => { const i = +b.dataset.sup; [P.sections[i - 1], P.sections[i]] = [P.sections[i], P.sections[i - 1]]; rer(); }));
+  $$('[data-sdown]', v).forEach((b) => (b.onclick = () => { const i = +b.dataset.sdown; [P.sections[i + 1], P.sections[i]] = [P.sections[i], P.sections[i + 1]]; rer(); }));
+  $$('[data-sdel]', v).forEach((b) => (b.onclick = () => { const i = +b.dataset.sdel; if (confirm(`Abschnitt „${P.sections[i].title}“ löschen?`)) { P.sections.splice(i, 1); rer(); } }));
+  $('#cAdd', v).onclick = () => { P.sections.push({ id: G.uid(6), icon: 'info', title: 'Neuer Abschnitt', text: '' }); rer(); setTimeout(() => { const t = $$('[data-stitle]').pop(); if (t) { t.focus(); t.select(); } }, 50); };
   $('#cSave', v).onclick = () => {
-    const merged = { ...S(), hofName: draft.hofName.trim(), subtitle: draft.subtitle.trim(), sections: draft.sections.filter((x) => x.title.trim() || x.text.trim()) };
-    store.saveSite(merged); site = merged; draft = null; toast('Gästemappe gespeichert'); render();
+    const props = draft.properties.map((p) => ({
+      ...p, name: (p.name || '').trim() || 'Unterkunft', subtitle: (p.subtitle || '').trim(), phone: (p.phone || '').trim(), whatsapp: (p.whatsapp || '').trim(),
+      email: (p.email || '').trim(), website: (p.website || '').trim(), deliveryText: (p.deliveryText || '').trim(),
+      sections: p.sections.filter((x) => x.title.trim() || x.text.trim()),
+    }));
+    const merged = { ...S(), properties: props };
+    store.saveSite(merged); site = merged; draft = null; toast(`Gästemappe „${props[contentProp].name}“ gespeichert`); render();
   };
 }
 
 // ---------- Unterkünfte ----------
 function unitsHtml() {
-  const list = [...units].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  const props = S().properties || [];
+  const row = (u) => `<button class="edit-row" data-unit="${esc(u.id)}">
+      <span class="info"><b>${esc(u.name)}</b><small>${[u.breakfast !== false ? 'Brötchenservice' : 'kein Brötchenservice', u.askSpot ? 'fragt Stellplatz' : '', u.wlanName ? 'WLAN' : ''].filter(Boolean).join(' · ')}</small></span>
+      ${ICON.chevron}</button>`;
+  const groups = props.map((p) => [p, units.filter((u) => G.propertyOf(S(), u).id === p.id).sort((a, b) => a.name.localeCompare(b.name, 'de'))]);
   return `
-    <div class="list">${list.map((u) => `<button class="edit-row" data-unit="${esc(u.id)}">
-      <span class="info"><b>${esc(u.name)}</b><small>${[u.breakfast !== false ? 'Frühstück' : 'kein Frühstück', u.askSpot ? 'fragt Stellplatz' : '', u.wlanName ? 'WLAN' : ''].filter(Boolean).join(' · ')}</small></span>
-      ${ICON.chevron}</button>`).join('') || '<div class="empty" style="padding:16px">Noch keine Unterkünfte.</div>'}</div>
+    ${units.length ? groups.map(([p, list]) => `<div class="section-title">${esc(p.name)}</div>
+      <div class="list">${list.map(row).join('') || '<div class="empty" style="padding:14px">Keine Unterkunft</div>'}</div>`).join('')
+      : '<div class="empty" style="padding:16px">Noch keine Unterkünfte.</div>'}
     <button class="btn" id="uAdd" style="margin-top:12px">${ICON.plus} Unterkunft hinzufügen</button>
     <button class="btn primary" id="uPrint">${ICON.print} QR-Codes für alle drucken</button>
     <p class="hint">Jede Unterkunft hat einen eigenen QR-Code. Damit wissen wir bei jeder Bestellung, wohin sie geliefert wird, und Gäste sehen das richtige WLAN. Am besten laminiert in die Wohnung hängen.</p>`;
@@ -213,14 +240,17 @@ function unitsHtml() {
 function bindUnits(v) {
   $$('[data-unit]', v).forEach((b) => (b.onclick = () => openUnit(units.find((u) => u.id === b.dataset.unit))));
   $('#uAdd', v).onclick = () => openUnit(null);
-  $('#uPrint', v).onclick = () => printQr([...units].sort((a, b) => a.name.localeCompare(b.name, 'de')));
+  $('#uPrint', v).onclick = () => printQr([...units].sort((a, b) => propIndex(G.propertyOf(S(), a).id) - propIndex(G.propertyOf(S(), b).id) || a.name.localeCompare(b.name, 'de')));
 }
 function openUnit(u) {
-  const d = u ? clone(u) : { name: '', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' };
+  const props = S().properties || [];
+  const d = u ? clone(u) : { name: '', property: props[0] && props[0].id, breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' };
+  const curProp = G.propertyOf(S(), d).id;
   openSheet(u ? u.name : 'Neue Unterkunft', `
     <label class="field"><span>Name</span><input class="input" id="eName" value="${esc(d.name)}" placeholder="z. B. Ferienwohnung Alpenblick"></label>
+    <label class="field"><span>Gehört zu</span><select class="input" id="eProp">${props.map((p) => `<option value="${esc(p.id)}" ${p.id === curProp ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
     <div class="panel">
-      <label class="toggle"><span>Frühstücksbestellung möglich</span><input type="checkbox" id="eBf" ${d.breakfast !== false ? 'checked' : ''}></label>
+      <label class="toggle"><span>Brötchenservice (Bestellung möglich)</span><input type="checkbox" id="eBf" ${d.breakfast !== false ? 'checked' : ''}></label>
       <label class="toggle"><span>Nach Stellplatz-Nummer fragen (Camping)</span><input type="checkbox" id="eSpot" ${d.askSpot ? 'checked' : ''}></label>
     </div>
     <div class="grid2">
@@ -235,7 +265,7 @@ function openUnit(u) {
     $('#eSave', sh).onclick = () => {
       const name = $('#eName', sh).value.trim();
       if (!name) { toast('Bitte einen Namen eingeben'); return; }
-      const data = { name, breakfast: $('#eBf', sh).checked, askSpot: $('#eSpot', sh).checked, wlanName: $('#eWn', sh).value.trim(), wlanPassword: $('#eWp', sh).value.trim(), note: $('#eNote', sh).value.trim() };
+      const data = { name, property: $('#eProp', sh).value, breakfast: $('#eBf', sh).checked, askSpot: $('#eSpot', sh).checked, wlanName: $('#eWn', sh).value.trim(), wlanPassword: $('#eWp', sh).value.trim(), note: $('#eNote', sh).value.trim() };
       store.saveUnit(u ? u.id : G.newUnitId(name), data);
       closeSheet(); toast('Gespeichert');
     };
@@ -262,9 +292,9 @@ function printQr(list) {
   if (location.protocol === 'file:') toast('Achtung: Die QR-Codes zeigen auf diese Datei am PC. Erst nach dem Veröffentlichen drucken!');
   const s = S();
   $('#printArea').innerHTML = list.map((u) => `<div class="qr-card">
-    <h3>${esc(s.hofName)}</h3><div class="unit">${esc(u.name)}</div>
+    <h3>${esc(G.propertyOf(s, u).name || s.hofName)}</h3><div class="unit">${esc(u.name)}</div>
     ${qrSvg(guestUrl(u.id))}
-    <p><b>Gästemappe${u.breakfast !== false && s.breakfast !== false ? ' & Frühstück bestellen' : ''}</b><br>Mit der Handy-Kamera scannen</p>
+    <p><b>Gästemappe${u.breakfast !== false && s.breakfast !== false ? ' & Brötchen bestellen' : ''}</b><br>Mit der Handy-Kamera scannen</p>
     <small>${esc(guestUrl(u.id))}</small></div>`).join('');
   document.body.classList.add('printing');
   const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
@@ -282,7 +312,7 @@ function settingsHtml() {
       <label class="toggle"><span>Frühstücksbestellung aktiv</span><input type="checkbox" id="sOn" ${d.breakfast !== false ? 'checked' : ''}></label>
       <label class="field"><span>Bestellschluss am Vortag</span><select class="input" id="sCut">
         ${Array.from({ length: 13 }, (_, i) => i + 10).map((h) => `<option value="${h}" ${+d.cutoffHour === h ? 'selected' : ''}>${h}:00 Uhr</option>`).join('')}</select></label>
-      <label class="field" style="margin:0"><span>Hinweis zur Lieferung</span><input class="input" id="sDeliv" value="${esc(d.deliveryText)}"></label>
+      <p class="hint" style="margin:0">Den Hinweis zur Lieferung und die Kontaktdaten stellst du pro Betrieb unter „Gästemappe“ ein. Ob eine einzelne Unterkunft bestellen kann, unter „Unterkünfte“.</p>
     </div>
     <div class="section-title">Produkte & Preise</div>
     <div class="panel" id="prodList">
@@ -305,12 +335,6 @@ function settingsHtml() {
       </div>
       <p class="hint" style="margin:0">Mit Nummer erscheint bei den Bestellungen ein Knopf, der die fertige Liste per WhatsApp an die Bäckerei schickt.</p>
     </div>
-    <div class="section-title">Kontakt für Gäste</div>
-    <div class="panel">
-      <label class="field"><span>Telefon</span><input class="input" id="sPhone" inputmode="tel" value="${esc(d.phone)}" placeholder="+43 …"></label>
-      <label class="field"><span>WhatsApp</span><input class="input" id="sWa" inputmode="tel" value="${esc(d.whatsapp)}" placeholder="+43 …"></label>
-      <label class="field" style="margin:0"><span>E-Mail</span><input class="input" id="sMail" type="email" value="${esc(d.email)}"></label>
-    </div>
     <button class="btn primary" id="sSave">Speichern</button>
     <div class="section-title">Konto</div>
     <div class="panel">${store.mode === 'demo' ? '<p class="hint" style="margin:0">Demo-Modus – kein Konto nötig. Für echte Bestellungen Firebase in config.js eintragen (siehe Anleitung).</p>'
@@ -330,10 +354,9 @@ function bindSettings(v) {
   $('#sSave', v).onclick = () => {
     const merged = {
       ...S(),
-      breakfast: $('#sOn', v).checked, cutoffHour: +$('#sCut', v).value, deliveryText: $('#sDeliv', v).value.trim(),
+      breakfast: $('#sOn', v).checked, cutoffHour: +$('#sCut', v).value,
       products: d.products.filter((p) => p.name.trim()).map((p) => ({ ...p, name: p.name.trim(), price: Math.round((p.price || 0) * 100) / 100 })),
       bakeryName: $('#sBName', v).value.trim(), bakeryPhone: $('#sBPhone', v).value.trim(),
-      phone: $('#sPhone', v).value.trim(), whatsapp: $('#sWa', v).value.trim(), email: $('#sMail', v).value.trim(),
     };
     store.saveSite(merged); site = merged; draft = null; toast('Einstellungen gespeichert'); render();
   };
@@ -382,6 +405,14 @@ function maybeSeed() {
     store.saveSite(G.defaultSite());
     if (!units.length) G.defaultUnits().forEach((u) => store.saveUnit(G.newUnitId(u.name), u));
     toast('Startinhalte angelegt – passe sie unter „Gästemappe“ und „Unterkünfte“ an.');
+  } else if (!Array.isArray(site.properties) || !site.properties.length) {
+    // Alte Version (ein gemeinsamer Hof) -> drei Betriebe
+    const migrated = G.migrateSite(site);
+    store.saveSite(migrated); site = migrated;
+    const { changes, adds } = G.migrateUnits(units);
+    changes.forEach(([id, data]) => store.saveUnit(id, data));
+    adds.forEach((u) => store.saveUnit(G.newUnitId(u.name), u));
+    toast('Umgestellt auf Stegerbauer, Nösslau Alm und Schoberhof');
   }
 }
 

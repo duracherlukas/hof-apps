@@ -1,5 +1,5 @@
 // Service Worker für die Verwaltung (offline starten). Nach Updates Versionsnummer erhöhen.
-const CACHE = 'gaeste-v2';
+const CACHE = 'gaeste-v3';
 const FILES = ['admin.html', 'index.html', 'style.css', 'common.js', 'admin.js', 'guest.js', 'config.js', 'vendor/qrcode.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

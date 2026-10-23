@@ -17,12 +17,17 @@ const cutoff = () => (Number.isFinite(+site.cutoffHour) ? +site.cutoffHour : 17)
 
 // ---------- Startseite ----------
 function homeHtml() {
-  const secs = site.sections || [];
-  let html = `
+  const P = unit ? G.propertyOf(site, unit) : null;
+  const secs = P ? (P.sections || []) : [];
+  let html = P ? `
     <header class="hero">
-      <small>${esc(site.subtitle || 'Eure digitale Gästemappe')}</small>
+      <small>${esc(P.subtitle || 'Eure digitale Gästemappe')}</small>
+      <h1>${esc(P.name || 'Willkommen')}</h1>
+      <span class="chip-unit">${ICON.home}${esc(unit.name)}</span>
+    </header>` : `
+    <header class="hero">
+      <small>Urlaub am Hochkönig</small>
       <h1>${esc(site.hofName || 'Willkommen')}</h1>
-      ${unit ? `<span class="chip-unit">${ICON.home}${esc(unit.name)}</span>` : ''}
     </header>`;
   if (store && store.mode === 'demo') {
     html += `<div class="demo-banner">Demo-Modus – Bestellungen bleiben nur auf diesem Gerät.
@@ -37,14 +42,17 @@ function homeHtml() {
     const open = myOrders.filter((o) => o.status !== 'storniert' && o.date >= G.today());
     html += `<section class="card breakfast-card">
       <h2>${ICON.bread} Frühstück bestellen</h2>
-      <p>Frisches Gebäck vom Bäcker und Produkte von unserem Hof – direkt zu eurer Unterkunft.</p>
+      <p>Frisches Gebäck vom Bäcker${(site.products || []).some((p) => p.active !== false && p.group === 'hof') ? ' und Produkte von unserem Bio-Bauernhof' : ''} – direkt zu eurer Unterkunft.</p>
+      ${P.deliveryText ? `<p class="muted" style="font-size:15px">${esc(P.deliveryText)}</p>` : ''}
       <div class="deadline">${ICON.clock}<span>Für <b>${esc(G.fmtDayRel(day))}</b> bestellbar bis <b>${esc(G.fmtDeadline(dl))}</b> (noch ${G.countdown(dl - G.now())})</span></div>
       <a class="btn warm" href="#bestellen">${ICON.bread} Jetzt bestellen</a>
       ${open.length ? `<div class="section-title" style="margin-top:16px">Eure Bestellungen</div><div class="list">${open.map(orderHtml).join('')}</div>` : ''}
     </section>`;
-  } else if (!unit && site.breakfast !== false) {
-    html += `<section class="card breakfast-card"><h2>${ICON.bread} Frühstück bestellen</h2>
-      <p class="muted">Scannt den QR-Code in eurer Unterkunft, um Frühstück zu bestellen.</p></section>`;
+  } else if (!unit) {
+    html += `<div class="note-box">Scannt den QR-Code in eurer Unterkunft – dann seht ihr hier eure Gästemappe${site.breakfast !== false ? ' und könnt Frühstück bestellen' : ''}.</div>
+      <div class="section-title">Unsere Unterkünfte</div>
+      <div class="list">${(site.properties || []).map((p) => `<a class="order" style="display:block;text-decoration:none;color:inherit" href="${esc(p.website || '#')}" target="_blank" rel="noopener">
+        <div class="head"><b>${esc(p.name)}</b><span>${ICON.chevron}</span></div><small>${esc(p.subtitle || '')}</small></a>`).join('')}</div>`;
   }
 
   // WLAN
@@ -64,13 +72,15 @@ function homeHtml() {
     </details>`).join('');
 
   // Kontakt
-  const wa = String(site.whatsapp || '').replace(/[^\d]/g, '');
-  const tel = String(site.phone || '').replace(/[^\d+]/g, '');
-  if (tel || wa || site.email) {
-    html += `<div class="section-title">Kontakt</div><div class="btn-grid">
+  const C = P || (site.properties || [])[0] || {};
+  const wa = String(C.whatsapp || '').replace(/[^\d]/g, '');
+  const tel = String(C.phone || '').replace(/[^\d+]/g, '');
+  if (tel || wa || C.email || C.website) {
+    html += `<div class="section-title">Kontakt${P ? '' : ' – Familie Herzog'}</div><div class="btn-grid">
       ${tel ? `<a class="btn" href="tel:${esc(tel)}">${ICON.phone}Anrufen</a>` : ''}
       ${wa ? `<a class="btn" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener">${ICON.chat}WhatsApp</a>` : ''}
-      ${site.email ? `<a class="btn" href="mailto:${esc(site.email)}">${ICON.mail}E-Mail</a>` : ''}
+      ${C.email ? `<a class="btn" href="mailto:${esc(C.email)}">${ICON.mail}E-Mail</a>` : ''}
+      ${P && C.website ? `<a class="btn" href="${esc(C.website)}" target="_blank" rel="noopener">${ICON.info}Webseite</a>` : ''}
     </div>`;
   }
   html += `<p class="footer">Wir wünschen euch einen schönen Aufenthalt!</p>`;
@@ -103,7 +113,7 @@ function orderViewHtml() {
   const savedName = G.store(NAME_KEY) || '';
   return `
     <div class="topnav"><a class="icon-btn" href="#" aria-label="Zurück">${ICON.back}</a><h1>Frühstück bestellen</h1></div>
-    <div class="note-box">${esc(unit.name)} · ${esc(site.deliveryText || '')}</div>
+    <div class="note-box">${esc(unit.name)}${G.propertyOf(site, unit).deliveryText ? ` · ${esc(G.propertyOf(site, unit).deliveryText)}` : ''}</div>
     <div class="section-title">Für welchen Tag?</div>
     <div class="days">${days.map((d) => `<button class="day ${d === chosenDay ? 'on' : ''}" data-day="${d}">
       <b>${esc(G.relDay(d) ? G.relDay(d)[0].toUpperCase() + G.relDay(d).slice(1) : G.fmtDay(d, { weekday: 'long' }))}</b>
@@ -198,7 +208,7 @@ function thanksHtml() {
     <p class="muted">Eure Bestellung für <b>${esc(G.fmtDay(o.date))}</b> ist bei uns angekommen.</p></div>
     <div class="card"><div class="items">${(o.items || []).map((it) => `${it.qty} × ${esc(it.name)}`).join('<br>')}</div>
       <p style="margin:10px 0 0"><b>Summe: ${money(o.total)}</b></p>
-      <p class="muted" style="margin:6px 0 0">${esc(site.deliveryText || '')}</p>
+      <p class="muted" style="margin:6px 0 0">${esc(G.propertyOf(site, unit).deliveryText || '')}</p>
       <p class="muted" style="margin:6px 0 0">Ändern oder stornieren könnt ihr bis ${esc(G.fmtDeadline(o.deadline))}.</p></div>
     <a class="btn primary" href="#">Zurück zur Gästemappe</a>`;
 }
@@ -253,7 +263,7 @@ async function boot() {
     });
   }
   await loadMyOrders();
-  if (site.hofName) document.title = site.hofName;
+  document.title = unit ? G.propertyOf(site, unit).name || 'Gästemappe' : (site.hofName || 'Gästemappe');
   if (location.hash === '#danke') location.hash = '';
   render();
   // Countdown und Bestellschluss jede Minute aktualisieren (nicht während man bestellt)

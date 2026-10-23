@@ -142,48 +142,162 @@ G.ICON = {
 };
 G.SECTION_ICONS = ['home', 'key', 'wifi', 'rules', 'recycle', 'sos', 'map', 'mountain', 'egg', 'bread', 'car', 'phone', 'info', 'book'];
 
-// ---------- Startinhalte ----------
+// ---------- Startinhalte: drei Betriebe der Familie Herzog ----------
+const NOTRUF = '- **112** – Euro-Notruf\n- **144** – Rettung\n- **122** – Feuerwehr\n- **133** – Polizei\n- **140** – Bergrettung / Alpinnotruf\n- **141** – Ärztenotdienst\n- **1450** – Gesundheitsberatung';
+const HOCHKOENIG_CARD = 'Mit der **Hochkönig Card** habt ihr als unsere Gäste viele Vorteile:\n\n**Sommer**\n- Unbegrenzt gratis mit den Bergbahnen in Maria Alm, Hintermoos, Hinterthal, Dienten und Mühlbach\n- Freier Eintritt ins Freibad Maria Alm und Mühlbach\n\n**Winter**\n- Einmal gratis Nachtskifahren in Maria Alm\n- Gratis GoPro-Helmkamera-Verleih\n- Weitere Ermäßigungen in der Region\n\nFragt uns einfach nach eurer Karte.';
+const MUELL = 'Bitte trennt euren Müll – danke! Die Tonnen findet ihr [hier eintragen].\n\n- **Restmüll** – schwarze Tonne\n- **Bio** – braune Tonne\n- **Papier** – rote Tonne\n- **Plastik & Metall** – gelber Sack\n- **Glas** – [hier eintragen]';
+
+G.defaultProperties = () => [
+  {
+    id: 'stegerbauer',
+    name: 'Bio-Bauernhof Stegerbauer',
+    subtitle: 'Urlaub am Bauernhof in Maria Alm',
+    phone: '+43 664 4805399',
+    whatsapp: '',
+    email: 'stegerbauer@sbg.at',
+    website: 'https://www.urlaub-hochkoenig.at/',
+    deliveryText: 'Wir bringen euch das Gebäck in der Früh vor die Wohnung bzw. zu eurem Wohnmobil.',
+    sections: [
+      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr bei uns am **Bio-Bauernhof Stegerbauer** in Maria Alm seid!\n\nHier findet ihr alles Wichtige für euren Urlaub. Wenn etwas fehlt oder nicht passt, meldet euch jederzeit bei uns – wir helfen gerne.\n\nEure Familie Herzog' },
+      { id: 'anreise', icon: 'key', title: 'An- & Abreise', text: '- Adresse: **Stegen 16, 5761 Maria Alm**\n- Anreise ab **[Uhrzeit eintragen]**\n- Abreise bis **[Uhrzeit eintragen]**\n- Parken: [hier eintragen]' },
+      { id: 'wohnung', icon: 'home', title: 'Eure Ferienwohnung', text: '- **WLAN** gratis – Name und Passwort stehen oben\n- Kabel-TV, Safe\n- Küche mit Herd, Geschirrspüler, Mikrowelle, Kühlschrank mit Gefrierfach, Kaffeemaschine und Wasserkocher\n- Balkon\n- Für die Kleinsten: **Babybett, Wickelauflage und Babybadewanne** – sagt uns einfach Bescheid' },
+      { id: 'stellplatz', icon: 'car', title: 'Wohnmobil-Stellplatz', text: '- Strom, Frischwasser und Entsorgung direkt am Platz\n- Ganzjährig geöffnet\n- Ins Ortszentrum sind es ca. 10 Minuten\n- Frische Semmeln könnt ihr hier in der App für den nächsten Morgen bestellen' },
+      { id: 'tiere', icon: 'egg', title: 'Unsere Tiere', text: 'Bei uns am Hof leben **Mutterkühe mit Kälbern und Stieren, Noriker-Pferde und Ponys mit Fohlen, Schafe, Ziegen, Hühner, Hasen, Katzen** und unser Hofhund **Lea**.\n\nIm Sommer sind die meisten Tiere oben auf der Alm – dort könnt ihr sie besuchen. Ziegen, Schafe, Hühner, Katzen und Lea bleiben am Hof.\n\nBitte füttert die Tiere nur nach Absprache mit uns.' },
+      { id: 'spielplatz', icon: 'info', title: 'Spielplatz', text: 'Vor dem Haus gibt es einen großen Spielplatz mit **Rutsche, Schaukel, Sandkiste, Spielhaus, Kletterturm, Trampolinen, Slackline, Go-Karts und Kindertraktoren** – und einen kleinen Fischteich.\n\nBitte passt auf die Kleinen auf, besonders beim Teich.' },
+      { id: 'hausregeln', icon: 'rules', title: 'Hausregeln', text: '- Nachtruhe von 22:00 bis 7:00 Uhr\n- Rauchen bitte nur im Freien\n- Haustiere sind willkommen (einmalig € 20)\n- Wir sind ein Arbeitsbetrieb: Bitte lasst Kinder nicht unbeaufsichtigt beim Stall, bei den Maschinen oder auf dem Hofplatz.' },
+      { id: 'card', icon: 'mountain', title: 'Hochkönig Card', text: HOCHKOENIG_CARD },
+      { id: 'tipps', icon: 'map', title: 'Ausflugstipps', text: '**Sommer**\n- **Abergbahn** – nur wenige Gehminuten von uns\n- **Erlebnisberg Natrun**\n- Wandern im **Steinernen Meer** und rund um den **Hochkönig**\n- Mountainbiken und Golf in Maria Alm\n\n**Winter**\n- Skigebiet Hochkönig – Abergbahn gleich in der Nähe\n- Langlaufen und Rodeln\n\nWetter & Webcam: https://www.urlaub-hochkoenig.at/maria-alm-land-salzburg/wetter-webcam-maria-alm' },
+      { id: 'muell', icon: 'recycle', title: 'Müll & Recycling', text: MUELL },
+      { id: 'notfall', icon: 'sos', title: 'Notfall & wichtige Nummern', text: NOTRUF + '\n\nNächster Arzt: [hier eintragen]\nNächste Apotheke: [hier eintragen]' },
+    ],
+  },
+  {
+    id: 'alm',
+    name: 'Nösslau Alm',
+    subtitle: 'Selbstversorger-Almhütte in Dienten am Hochkönig',
+    phone: '+43 6584 7765',
+    whatsapp: '',
+    email: 'stegerbauer@sbg.at',
+    website: 'https://www.almhuette-hochkoenig.at/',
+    deliveryText: 'Brötchenservice in der Wintersaison – wir bringen euch das Gebäck in der Früh zur Hütte.',
+    sections: [
+      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr auf der **Nösslau Alm** seid!\n\nEure Hütte liegt auf rund **1.220 m** etwas außerhalb von Dienten am Hochkönig – in ruhiger, sonniger Alleinlage mit Aussicht. Genießt die Zeit auf der Alm!\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
+      { id: 'anreise', icon: 'key', title: 'An- & Abreise', text: '- Anreise ab **[Uhrzeit eintragen]**\n- Abreise bis **[Uhrzeit eintragen]**\n- In der Hauptsaison wird von **Samstag bis Samstag** vermietet\n- Schlüssel: [hier eintragen]\n\n**Im Winter** braucht ihr ein **Allradfahrzeug und Schneeketten**. Bei schwierigen Schneeverhältnissen gibt es einen Parkplatz direkt an der Hütte.' },
+      { id: 'huette', icon: 'home', title: 'Die Hütte', text: '- **5 Schlafzimmer** (3 Doppelzimmer, eines davon mit Stockbett, und 2 Mehrbettzimmer)\n- Große, gemütliche **Stube** mit Kachelofen\n- Küche mit E-Herd und Backrohr, **Holzherd**, Geschirrspüler, Mikrowelle, Kaffeemaschine, Toaster, Wasserkocher und Kühlschrank\n- **3 WC, 2 Duschen und Sauna**\n- Fernseher und Radio\n- Terrasse und Balkon\n- Trockenraum für Kleidung und Schuhe\n- Vorratskeller mit Gefriertruhe' },
+      { id: 'heizen', icon: 'info', title: 'Heizen mit Holz', text: 'Die Hütte heizt ihr selbst mit Holz – das Holz stellen wir euch zur Verfügung. Es liegt [hier eintragen].\n\n- Ofentüren nach dem Nachlegen immer schließen\n- Asche nur ganz ausgekühlt in den Aschekübel – nie in den Müll\n- Bitte vor dem Schlafengehen kein Holz mehr nachlegen' },
+      { id: 'kuehe', icon: 'egg', title: 'Kühe auf der Alm', text: 'Von Frühjahr bis Herbst weiden **Mutterkühe mit ihren Kälbern** rund um die Hütte.\n\n- Bitte haltet Abstand und geht nicht zwischen Kuh und Kalb\n- Hunde an die kurze Leine\n- Weidetore nach dem Durchgehen wieder schließen' },
+      { id: 'card', icon: 'mountain', title: 'Hochkönig Card', text: HOCHKOENIG_CARD },
+      { id: 'tipps', icon: 'map', title: 'Ausflugstipps', text: 'Rund um Dienten gibt es viele Wanderwege mit herrlicher Aussicht auf den Hochkönig.\n\n- [Wanderung – Gehzeit, Einkehr]\n- [Hütten-Tipp]\n- [Ausflug bei Schlechtwetter]\n\nWetter: https://www.almhuette-hochkoenig.at/wetter-in-maria-alm' },
+      { id: 'muell', icon: 'recycle', title: 'Müll & Recycling', text: MUELL },
+      { id: 'notfall', icon: 'sos', title: 'Notfall & wichtige Nummern', text: NOTRUF + '\n\nBeim Notruf sagen: **„Nösslau Alm oberhalb von Dienten am Hochkönig“**\nGenauer Standort: [GPS-Koordinaten eintragen]\n\nNächster Arzt: [hier eintragen]' },
+    ],
+  },
+  {
+    id: 'schoberhof',
+    name: 'Selbstversorgerhaus Schoberhof',
+    subtitle: 'Gruppenhaus in Dienten am Hochkönig',
+    phone: '+43 6584 7765',
+    whatsapp: '',
+    email: 'stegerbauer@sbg.at',
+    website: 'https://www.ferienhaus-dienten.at/',
+    deliveryText: 'Brötchenservice in der Wintersaison – wir bringen euch das Gebäck in der Früh zum Haus.',
+    sections: [
+      { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr im **Selbstversorgerhaus Schoberhof** seid!\n\nDas Haus liegt auf rund **1.100 m**, etwa 3 km von Dienten am Hochkönig – ruhig und sonnig, mitten in Wiesen und Wäldern. Hier können die Kinder frei herumtollen.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
+      { id: 'anreise', icon: 'key', title: 'An- & Abreise', text: '- Adresse: **Lindlweg 5, 5761 Maria Alm**\n- Anreise ab **[Uhrzeit eintragen]**\n- Abreise bis **[Uhrzeit eintragen]**\n- Parkplätze direkt am Hof – auch bei viel Schnee\n- Schlüssel: [hier eintragen]\n\n**Im Winter** braucht ihr ein **Allradfahrzeug und Schneeketten**.' },
+      { id: 'haus', icon: 'home', title: 'Das Haus', text: '- **10 Schlafzimmer**\n- Große **Bauernstube** mit Kachelofen, Fernseher und **WLAN** (Name und Passwort stehen oben)\n- Küche mit Geschirrspüler, Mikrowelle, Kaffeemaschine, Kühlschrank und Gefrierschrank\n- **6 Duschen und 8 WC**\n- **Waschmaschine und Wäschetrockner**\n- **Sauna**\n- Balkon und 2 Terrassen' },
+      { id: 'fischteich', icon: 'info', title: 'Fischteich', text: 'Im hauseigenen Fischteich könnt ihr **Forellen fangen**.\n\n[Angelausrüstung, Preis pro Fisch und Regeln hier eintragen]' },
+      { id: 'essen', icon: 'bread', title: 'Essen & Feiern', text: '- Gasthäuser mit traditioneller Küche sind nicht weit\n- **Partyservice** auf Anfrage – sprecht uns einfach an' },
+      { id: 'hausregeln', icon: 'rules', title: 'Hausregeln', text: '- Nachtruhe von 22:00 bis 7:00 Uhr\n- Rauchen bitte nur im Freien\n- [weitere Regeln hier eintragen]' },
+      { id: 'card', icon: 'mountain', title: 'Hochkönig Card', text: HOCHKOENIG_CARD },
+      { id: 'tipps', icon: 'map', title: 'Ausflugstipps', text: '- Skigebiet Hochkönig – Lifte in Dienten ganz in der Nähe\n- Wandern rund um Dienten und Maria Alm\n- [eigener Tipp]\n\nWetter: https://www.ferienhaus-dienten.at/wetter-in-maria-alm' },
+      { id: 'muell', icon: 'recycle', title: 'Müll & Recycling', text: MUELL },
+      { id: 'notfall', icon: 'sos', title: 'Notfall & wichtige Nummern', text: NOTRUF + '\n\nAdresse für den Notruf: **Schoberhof, Lindlweg 5, bei Dienten am Hochkönig**\n\nNächster Arzt: [hier eintragen]' },
+    ],
+  },
+];
+
 G.defaultSite = () => ({
-  hofName: 'Urlaub am Bauernhof',
-  subtitle: 'Eure digitale Gästemappe',
+  hofName: 'Familie Herzog',
   breakfast: true,
   cutoffHour: 17,
-  deliveryText: 'Wir stellen euch das Frühstück bis 7:30 Uhr vor die Tür.',
-  phone: '',
-  whatsapp: '',
-  email: '',
   bakeryName: '',
   bakeryPhone: '',
-  sections: [
-    { id: 'willkommen', icon: 'home', title: 'Willkommen', text: 'Schön, dass ihr bei uns seid! Hier findet ihr alles Wichtige für euren Aufenthalt.\n\nWenn etwas fehlt oder kaputt ist, meldet euch bitte jederzeit – wir helfen gerne.' },
-    { id: 'anreise', icon: 'key', title: 'An- & Abreise', text: '- Anreise ab **15:00 Uhr**\n- Abreise bis **10:00 Uhr**\n- Bitte lasst den Schlüssel bei der Abreise in der Wohnung stecken.\n- Parkplätze: [hier eintragen]' },
-    { id: 'hausregeln', icon: 'rules', title: 'Hausregeln', text: '- Nachtruhe von 22:00 bis 7:00 Uhr\n- Rauchen bitte nur im Freien\n- Haustiere nur nach Absprache\n- Wir sind ein Arbeitsbetrieb: Bitte lasst Kinder nicht unbeaufsichtigt beim Stall, bei Maschinen oder auf dem Hofplatz spielen.' },
-    { id: 'muell', icon: 'recycle', title: 'Müll & Recycling', text: 'Die Mülltonnen findet ihr [hier eintragen].\n\n- **Restmüll** – schwarze Tonne\n- **Bio** – braune Tonne\n- **Papier** – rote Tonne\n- **Plastik & Metall** – gelber Sack\n- **Glas** – bitte in den Container [hier eintragen]' },
-    { id: 'notfall', icon: 'sos', title: 'Notfall & wichtige Nummern', text: '- **112** – Euro-Notruf\n- **144** – Rettung\n- **122** – Feuerwehr\n- **133** – Polizei\n- **140** – Bergrettung / Alpinnotruf\n- **141** – Ärztenotdienst\n- **1450** – Gesundheitsberatung\n\nNächster Arzt: [hier eintragen]\nNächste Apotheke: [hier eintragen]' },
-    { id: 'tipps', icon: 'mountain', title: 'Ausflugstipps', text: 'Unsere Lieblingsziele in der Umgebung:\n\n- [Wanderung – Gehzeit, Einkehr]\n- [Badesee / Hallenbad]\n- [Ausflug bei Schlechtwetter]\n- [Restaurant-Tipp]' },
-    { id: 'hof', icon: 'egg', title: 'Vom Hof', text: 'Frische Milch, Eier und hausgemachte Marmelade bekommt ihr direkt bei uns – einfach mit der Frühstücksbestellung dazu bestellen oder fragen.' },
-  ],
+  properties: G.defaultProperties(),
   products: [
     { id: 'semmel', name: 'Semmel', price: 0.6, group: 'baecker', active: true },
     { id: 'kornspitz', name: 'Kornspitz', price: 1.0, group: 'baecker', active: true },
     { id: 'vollkorn', name: 'Vollkornweckerl', price: 0.9, group: 'baecker', active: true },
     { id: 'croissant', name: 'Croissant', price: 1.4, group: 'baecker', active: true },
     { id: 'brot', name: 'Bauernbrot (½ Laib)', price: 2.9, group: 'baecker', active: true },
-    { id: 'milch', name: 'Frische Milch vom Hof (1 l)', price: 1.5, group: 'hof', active: true },
-    { id: 'eier', name: 'Eier vom Hof (6 Stück)', price: 3.0, group: 'hof', active: true },
-    { id: 'butter', name: 'Butter (250 g)', price: 3.5, group: 'hof', active: true },
-    { id: 'marmelade', name: 'Hausgemachte Marmelade', price: 4.5, group: 'hof', active: true },
+    { id: 'eier', name: 'Bio-Eier von unseren Hühnern (6 Stück)', price: 3.0, group: 'hof', active: true },
+    { id: 'marmelade', name: 'Hausgemachte Marmelade', price: 4.5, group: 'hof', active: false },
   ],
 });
 G.defaultUnits = () => [
-  { name: 'Ferienwohnung 1', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
-  { name: 'Ferienwohnung 2', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
-  { name: 'Selbstversorgerhaus', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
-  { name: 'Camping', breakfast: true, askSpot: true, wlanName: '', wlanPassword: '', note: '' },
-  { name: 'Almhütte', breakfast: false, askSpot: false, wlanName: '', wlanPassword: '', note: 'Auf der Almhütte gibt es kein WLAN und keinen Frühstücksservice.' },
+  { name: 'Ferienwohnung Schwalbenwand', property: 'stegerbauer', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
+  { name: 'Ferienwohnung Alpenblick', property: 'stegerbauer', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
+  { name: 'Ferienwohnung Aberg', property: 'stegerbauer', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
+  { name: 'Ferienwohnung Wiesenblick', property: 'stegerbauer', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
+  { name: 'Wohnmobil-Stellplatz', property: 'stegerbauer', breakfast: true, askSpot: true, wlanName: '', wlanPassword: '', note: '' },
+  { name: 'Nösslau Alm', property: 'alm', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
+  { name: 'Selbstversorgerhaus Schoberhof', property: 'schoberhof', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
 ];
 G.newUnitId = (name) => `${G.slug(name)}-${G.uid(6)}`;
-G.mergeSite = (s) => ({ ...G.defaultSite(), ...(s || {}) });
+G.mergeSite = (s) => {
+  const base = G.defaultSite();
+  const m = { ...base, ...(s || {}) };
+  if (!Array.isArray(m.properties) || !m.properties.length) m.properties = base.properties;
+  return m;
+};
+G.propertyOf = (site, unit) => {
+  const props = (site && site.properties) || [];
+  return props.find((p) => unit && p.id === unit.property) || props[0] || {};
+};
+
+// Umstellung von der alten Version (ein gemeinsamer Hof) auf drei Betriebe
+const LEGACY_SECTIONS = [{"id":"willkommen","icon":"home","title":"Willkommen","text":"Schön, dass ihr bei uns seid! Hier findet ihr alles Wichtige für euren Aufenthalt.\n\nWenn etwas fehlt oder kaputt ist, meldet euch bitte jederzeit – wir helfen gerne."},{"id":"anreise","icon":"key","title":"An- & Abreise","text":"- Anreise ab **15:00 Uhr**\n- Abreise bis **10:00 Uhr**\n- Bitte lasst den Schlüssel bei der Abreise in der Wohnung stecken.\n- Parkplätze: [hier eintragen]"},{"id":"hausregeln","icon":"rules","title":"Hausregeln","text":"- Nachtruhe von 22:00 bis 7:00 Uhr\n- Rauchen bitte nur im Freien\n- Haustiere nur nach Absprache\n- Wir sind ein Arbeitsbetrieb: Bitte lasst Kinder nicht unbeaufsichtigt beim Stall, bei Maschinen oder auf dem Hofplatz spielen."},{"id":"muell","icon":"recycle","title":"Müll & Recycling","text":"Die Mülltonnen findet ihr [hier eintragen].\n\n- **Restmüll** – schwarze Tonne\n- **Bio** – braune Tonne\n- **Papier** – rote Tonne\n- **Plastik & Metall** – gelber Sack\n- **Glas** – bitte in den Container [hier eintragen]"},{"id":"notfall","icon":"sos","title":"Notfall & wichtige Nummern","text":"- **112** – Euro-Notruf\n- **144** – Rettung\n- **122** – Feuerwehr\n- **133** – Polizei\n- **140** – Bergrettung / Alpinnotruf\n- **141** – Ärztenotdienst\n- **1450** – Gesundheitsberatung\n\nNächster Arzt: [hier eintragen]\nNächste Apotheke: [hier eintragen]"},{"id":"tipps","icon":"mountain","title":"Ausflugstipps","text":"Unsere Lieblingsziele in der Umgebung:\n\n- [Wanderung – Gehzeit, Einkehr]\n- [Badesee / Hallenbad]\n- [Ausflug bei Schlechtwetter]\n- [Restaurant-Tipp]"},{"id":"hof","icon":"egg","title":"Vom Hof","text":"Frische Milch, Eier und hausgemachte Marmelade bekommt ihr direkt bei uns – einfach mit der Frühstücksbestellung dazu bestellen oder fragen."}];
+const LEGACY_PRODUCTS = [{"id":"semmel","name":"Semmel","price":0.6,"group":"baecker","active":true},{"id":"kornspitz","name":"Kornspitz","price":1.0,"group":"baecker","active":true},{"id":"vollkorn","name":"Vollkornweckerl","price":0.9,"group":"baecker","active":true},{"id":"croissant","name":"Croissant","price":1.4,"group":"baecker","active":true},{"id":"brot","name":"Bauernbrot (½ Laib)","price":2.9,"group":"baecker","active":true},{"id":"milch","name":"Frische Milch vom Hof (1 l)","price":1.5,"group":"hof","active":true},{"id":"eier","name":"Eier vom Hof (6 Stück)","price":3.0,"group":"hof","active":true},{"id":"butter","name":"Butter (250 g)","price":3.5,"group":"hof","active":true},{"id":"marmelade","name":"Hausgemachte Marmelade","price":4.5,"group":"hof","active":true}];
+const sameProducts = (a, b) => JSON.stringify((a || []).map((p) => [p.id, p.name, p.price, p.group, p.active !== false])) === JSON.stringify(b.map((p) => [p.id, p.name, p.price, p.group, p.active !== false]));
+const LEGACY_RENAME = {
+  'Ferienwohnung 1': ['Ferienwohnung Schwalbenwand', 'stegerbauer'],
+  'Ferienwohnung 2': ['Ferienwohnung Alpenblick', 'stegerbauer'],
+  Camping: ['Wohnmobil-Stellplatz', 'stegerbauer'],
+  'Almhütte': ['Nösslau Alm', 'alm'],
+  Selbstversorgerhaus: ['Selbstversorgerhaus Schoberhof', 'schoberhof'],
+};
+G.migrateSite = (old) => {
+  const fresh = G.defaultSite();
+  const props = fresh.properties;
+  // eigene, schon geänderte Texte nicht verwerfen
+  if (Array.isArray(old.sections) && JSON.stringify(old.sections) !== JSON.stringify(LEGACY_SECTIONS)) {
+    props[0].sections = old.sections;
+  }
+  ['phone', 'whatsapp', 'email'].forEach((k) => { if (old[k]) props[0][k] = old[k]; });
+  return {
+    ...fresh,
+    breakfast: old.breakfast !== false,
+    cutoffHour: old.cutoffHour ?? 17,
+    bakeryName: old.bakeryName || '',
+    bakeryPhone: old.bakeryPhone || '',
+    products: Array.isArray(old.products) && old.products.length && !sameProducts(old.products, LEGACY_PRODUCTS) ? old.products : fresh.products,
+    properties: props,
+  };
+};
+G.migrateUnits = (units) => {
+  const changes = [];
+  const names = new Set(units.map((u) => u.name));
+  units.forEach((u) => {
+    if (u.property) return;
+    const r = LEGACY_RENAME[u.name];
+    const upd = { ...u, property: r ? r[1] : 'stegerbauer' };
+    if (r) { upd.name = r[0]; names.add(r[0]); }
+    if (u.name === 'Almhütte') { upd.breakfast = true; if (/kein WLAN und keinen Frühstücksservice/.test(u.note || '')) upd.note = ''; }
+    delete upd.id;
+    changes.push([u.id, upd]);
+  });
+  const adds = G.defaultUnits().filter((d) => !names.has(d.name) && changes.length);
+  return { changes, adds };
+};
 
 // ---------- Datenspeicher ----------
 const FB = 'https://www.gstatic.com/firebasejs/13.1.0';
