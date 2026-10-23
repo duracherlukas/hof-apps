@@ -1,6 +1,6 @@
 // Service Worker: App offline verfügbar machen.
 // Nach einem Update der App-Dateien die Versionsnummer erhöhen (v2, v3 …).
-const CACHE = 'hof-maschinen-v2';
+const CACHE = 'hof-maschinen-v3';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'store.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

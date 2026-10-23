@@ -10,7 +10,8 @@ service cloud.firestore {
     function istHofMitglied() {
       return request.auth != null
         && request.auth.token.email in [
-          'deine.email@gmail.com'
+          'duracherlukas@gmail.com',
+          'sepperlupa@gmail.com'
           // , 'weitere.person@beispiel.at'
         ];
     }
@@ -21,7 +22,10 @@ service cloud.firestore {
 
     // ---------- Hof-Karte ----------
     match /features/{id} { allow read, write: if istHofMitglied(); }
-    match /photos/{id}   { allow read, write: if istHofMitglied() && (request.resource == null || request.resource.data.data.size() < 900000); }
+    match /photos/{id} {
+      allow read, delete: if istHofMitglied();
+      allow create, update: if istHofMitglied() && request.resource.data.data.size() < 900000;
+    }
     match /hofkarte/{id} { allow read, write: if istHofMitglied(); }
 
     // ---------- Gäste-App ----------

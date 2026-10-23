@@ -1,6 +1,6 @@
 // Service Worker: App offline starten + bereits angesehene Kartenkacheln merken
 // (so funktioniert die Karte auch draußen mit schlechtem Empfang). Nach Updates Version erhöhen.
-const CACHE = 'hofkarte-v1';
+const CACHE = 'hofkarte-v2';
 const TILES = 'hofkarte-tiles-v1';
 const MAX_TILES = 3000;
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'store.js', 'config.js', 'manifest.webmanifest',

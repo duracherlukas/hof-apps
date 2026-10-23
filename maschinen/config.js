@@ -9,12 +9,12 @@ window.HOF_CONFIG = {
   // (Projekteinstellungen › Allgemein › Deine Apps › Web-App › SDK-Konfiguration).
   // Solange apiKey leer ist, läuft die App im Demo-Modus (Daten nur auf diesem Gerät).
   firebase: {
-    apiKey: '',
-    authDomain: '',
-    projectId: '',
-    storageBucket: '',
-    messagingSenderId: '',
-    appId: '',
+    apiKey: 'AIzaSyDPPV_0slhGyHkm7iVwKw5CM9Uvva96xmI',
+    authDomain: 'hof-apps.firebaseapp.com',
+    projectId: 'hof-apps',
+    storageBucket: 'hof-apps.firebasestorage.app',
+    messagingSenderId: '1810222157',
+    appId: '1:1810222157:web:9b6f2232cf8757f3522004',
   },
 
   // Vorschläge, die beim Anlegen einer Maschine angezeigt werden
