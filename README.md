@@ -31,3 +31,4 @@ Kalorien und Wandertagebuch brauchen kein Firebase. Der Gemini-Key für die Kalo
 
 Geänderte Dateien wieder hochladen (gleicher Weg, vorhandene werden ersetzt) und in der `sw.js` der jeweiligen App die Versionsnummer in `const CACHE = '…-v1'` um eins erhöhen.
 Update Gäste-App 23.10.
+gast
