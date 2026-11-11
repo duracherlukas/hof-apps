@@ -1,5 +1,5 @@
 // Service Worker: App offline starten + angesehene Kartenteile merken. Nach Updates Version erhöhen.
-const CACHE = 'wandertagebuch-v1';
+const CACHE = 'wandertagebuch-v3';
 const TILES = 'wandertagebuch-tiles-v1';
 const MAX_TILES = 2500;
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest', 'vendor/leaflet/leaflet.js', 'vendor/leaflet/leaflet.css',

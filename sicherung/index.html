@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Datensicherung</title>
+<meta name="description" content="Alle Hof-Daten aus Firebase als Datei sichern und wiederherstellen">
+<meta name="theme-color" content="#f5f3ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141210" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sicherung">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="../shared/hof.css">
+<style>:root { --accent: #46505a; --accent-soft: #e2e6ea; } @media (prefers-color-scheme: dark) { :root { --accent: #9fb0c0; } } .fab { box-shadow: 0 6px 18px rgba(0,0,0,.2); }</style>
+</head>
+<body>
+<div id="boot" class="boot"><div class="spinner"></div></div>
+<script>setTimeout(function () { var b = document.getElementById('boot'); if (b && !b.hidden) b.innerHTML = '<div class="err-box" style="margin:20px;max-width:420px">Die App startet nicht. Prüfe die Internetverbindung und lade die Seite neu.</div>'; }, 9000);</script>
+<section id="login" class="login" hidden>
+  <img src="icons/icon-192.png" alt="" width="72" height="72">
+  <h1 id="loginTitle">Datensicherung</h1>
+  <p class="muted">Melde dich mit deinem Hof-Konto an (wie bei den Maschinen).</p>
+  <form id="loginForm">
+    <label class="field"><span>E-Mail</span><input class="input" id="loginEmail" type="email" autocomplete="username" required></label>
+    <label class="field"><span>Passwort</span><input class="input" id="loginPw" type="password" autocomplete="current-password" required></label>
+    <div class="err-box" id="loginErr" hidden></div>
+    <button class="btn primary" id="loginBtn">Anmelden</button>
+  </form>
+  <button class="link" id="forgotPw">Passwort vergessen?</button>
+</section>
+<div id="app" hidden>
+  <header class="topbar">
+    <a class="icon-btn" href="../" aria-label="Alle Hof-Apps" title="Alle Hof-Apps"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></a>
+    <div class="title"><h1>Datensicherung</h1><small id="syncState"></small></div>
+    <button class="icon-btn" id="openSettings" aria-label="Abmelden" title="Abmelden"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></button>
+  </header>
+  <div class="demo-banner" id="demoBanner" hidden>Demo-Modus: Daten bleiben nur auf diesem Gerät.</div>
+  <main id="view"></main>
+  </div>
+<div class="overlay" id="overlay" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden>
+  <div class="sheet-head">
+    <button class="icon-btn" id="sheetBack" aria-label="Zurück" hidden><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h2 id="sheetTitle"></h2>
+    <button class="icon-btn" id="sheetClose" aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="../maschinen/config.js"></script>
+<script src="../shared/hof.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

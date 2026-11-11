@@ -5,7 +5,7 @@
 
 // ---------- Konstanten ----------
 const STORE = 'kalorien_v1';
-const VERSION = '1.0';
+const VERSION = '1.1';
 const MEALS = [
   { id: 'breakfast', name: 'Frühstück' },
   { id: 'lunch', name: 'Mittagessen' },
@@ -228,7 +228,7 @@ function renderMeals() {
         <li><button class="entry" data-entry="${e.id}">
           <span class="src-dot ${esc(e.src)}"></span>
           <span class="info"><span class="name">${esc(e.name)}</span>
-          <small>${e.grams ? fmt(e.grams) + ' ' + esc(e.unit) : 'Portion'}${e.brand ? ' · ' + esc(e.brand) : ''}</small></span>
+          <small>${e.unit === 'Portion' ? `${fmt1(e.grams)} ${e.grams === 1 ? 'Portion' : 'Portionen'}` : e.grams ? fmt(e.grams) + ' ' + esc(e.unit) : 'Portion'}${e.brand ? ' · ' + esc(e.brand) : ''}</small></span>
           <span class="val num">${fmt(e.kcal)} kcal</span>
         </button></li>`).join('')}</ul>` : ''}
     </div>`;
@@ -263,15 +263,224 @@ function renderWeek() {
       ${g.kcal ? `<line class="goal-line" x1="0" x2="${W}" y1="${y(g.kcal)}" y2="${y(g.kcal)}"/>` : ''}
       ${bars}
     </svg>
-    <div class="avg">${logged.length ? `Ø ${fmt(avg)} kcal an ${logged.length} ${logged.length === 1 ? 'Tag' : 'Tagen'} mit Einträgen` : 'Noch keine Einträge in dieser Woche.'}${g.kcal ? ' · gestrichelt = Ziel' : ''}</div>`;
+    <div class="avg">${logged.length ? `Ø ${fmt(avg)} kcal an ${logged.length} ${logged.length === 1 ? 'Tag' : 'Tagen'} mit Einträgen` : 'Noch keine Einträge in dieser Woche.'}${g.kcal ? ' · gestrichelt = Ziel' : ''}</div>
+    ${logged.length && g.kcal ? (() => {
+      const inGoal = logged.filter((v) => v >= g.kcal * 0.9 && v <= g.kcal * 1.1).length;
+      const wk = days.map((k) => totals(entriesOf(k))).filter((t) => t.kcal > 0);
+      const avgM = (key) => wk.reduce((s, t) => s + t[key], 0) / wk.length;
+      const water = days.map((k) => ((db.water || {})[k] || 0) * GLASS).filter((x) => x > 0);
+      return `<div class="week-stats">
+        <div><b class="num">${inGoal}/${logged.length}</b><small>Tage im Ziel (±10 %)</small></div>
+        <div><b class="num">${fmt(avgM('p'))} g</b><small>Ø Eiweiß</small></div>
+        <div><b class="num">${water.length ? fmt1(water.reduce((a, b) => a + b, 0) / water.length) : '–'} l</b><small>Ø Wasser</small></div></div>`;
+    })() : ''}`;
 }
 
 function render() {
   renderHeader();
   renderSummary();
+  renderWater();
   renderMeals();
   renderWeek();
+  renderWeight();
+  renderBackupHint();
 }
+// ---------- Wasser ----------
+const GLASS = 0.25;
+function renderWater() {
+  const el = $('#water'); if (!el) return;
+  db.water = db.water || {};
+  const n = db.water[day] || 0;
+  const goal = db.settings.waterGoal || 2.5;
+  const max = Math.max(Math.ceil(goal / GLASS), n);
+  el.innerHTML = `<div class="water-head"><h3>💧 Wasser</h3><span class="num"><b>${fmt1(n * GLASS)}</b> / ${fmt1(goal)} l</span></div>
+    <div class="glasses">${Array.from({ length: max }, (_, i) => `<button class="glass ${i < n ? 'full' : ''}" data-glass="${i}" aria-label="${i + 1}. Glas"></button>`).join('')}</div>
+    <div class="water-btns"><button class="btn small" data-water="-1" ${n ? '' : 'disabled'}>− Glas</button><button class="btn small primary" data-water="1">+ Glas (0,25 l)</button></div>`;
+  const set = (v) => { db.water[day] = Math.max(0, v); if (!db.water[day]) delete db.water[day]; save(); renderWater(); };
+  $$('[data-water]', el).forEach((b) => (b.onclick = () => set(n + +b.dataset.water)));
+  $$('[data-glass]', el).forEach((b) => (b.onclick = () => set(+b.dataset.glass + 1 === n ? n - 1 : +b.dataset.glass + 1)));
+}
+
+// ---------- Gewicht ----------
+function weights() { return (db.weights || []).slice().sort((a, b) => a.d.localeCompare(b.d)); }
+function renderWeight() {
+  const el = $('#weight'); if (!el) return;
+  const ws = weights();
+  const last = ws[ws.length - 1];
+  const target = db.settings.targetWeight || null;
+  let chart = '';
+  const pts = ws.filter((w) => w.d >= addDays(todayKey(), -120));
+  if (pts.length >= 2) {
+    const W = 320, H = 120, pad = 10;
+    const vals = pts.map((p) => p.kg).concat(target ? [target] : []);
+    const mn = Math.min(...vals) - 0.5, mx = Math.max(...vals) + 0.5;
+    const t0 = parseKey(pts[0].d).getTime(), t1 = parseKey(pts[pts.length - 1].d).getTime() || t0 + 1;
+    const x = (d) => pad + ((parseKey(d).getTime() - t0) / Math.max(t1 - t0, 1)) * (W - 2 * pad);
+    const y = (v) => pad + (1 - (v - mn) / (mx - mn)) * (H - 2 * pad);
+    chart = `<svg viewBox="0 0 ${W} ${H}" class="wchart" role="img" aria-label="Gewichtsverlauf">
+      ${target ? `<line class="goal-line" x1="0" x2="${W}" y1="${y(target)}" y2="${y(target)}"/>` : ''}
+      <polyline class="wline" points="${pts.map((p) => `${x(p.d)},${y(p.kg)}`).join(' ')}"/>
+      ${pts.map((p) => `<circle class="wdot" cx="${x(p.d)}" cy="${y(p.kg)}" r="3"/>`).join('')}</svg>`;
+  }
+  const month = ws.filter((w) => w.d <= addDays(todayKey(), -28)).pop();
+  const diff = last && month ? last.kg - month.kg : null;
+  el.innerHTML = `<div class="water-head"><h3>⚖️ Gewicht</h3>${last ? `<span class="num"><b>${fmt1(last.kg)} kg</b></span>` : ''}</div>
+    ${last ? `<div class="avg">${diff != null ? `${diff > 0 ? '+' : ''}${fmt1(diff)} kg in 4 Wochen · ` : ''}zuletzt ${parseKey(last.d).toLocaleDateString('de-AT', { day: 'numeric', month: 'short' })}${target ? ` · Ziel ${fmt1(target)} kg${last ? ` (noch ${fmt1(Math.abs(last.kg - target))} kg)` : ''}` : ''}</div>` : '<div class="avg">Trag dein Gewicht ab und zu ein – hier siehst du dann den Verlauf.</div>'}
+    ${chart}
+    <button class="btn small" id="wAdd" style="margin-top:8px">+ Gewicht eintragen</button>`;
+  $('#wAdd', el).onclick = () => openSheet(viewWeight);
+}
+function viewWeight() {
+  const ws = weights();
+  const last = ws[ws.length - 1];
+  return {
+    title: 'Gewicht',
+    html: `<div class="grid2">
+        <label class="field"><span>Gewicht (kg)</span><input class="input num" id="wKg" inputmode="decimal" value="${last ? fmtIn(last.kg) : esc(db.settings.profile.weight || '')}"></label>
+        <label class="field"><span>Datum</span><input class="input" id="wDate" type="date" value="${day}"></label></div>
+      <label class="field"><span>Zielgewicht (kg, optional)</span><input class="input num" id="wTarget" inputmode="decimal" value="${db.settings.targetWeight ? fmtIn(db.settings.targetWeight) : ''}"></label>
+      <button class="btn primary" id="wSave">Speichern</button>
+      ${ws.length ? `<div class="section-title">Verlauf</div><div class="list">${ws.slice().reverse().slice(0, 30).map((w) => `<div class="list-item"><span class="info"><span class="name">${fmt1(w.kg)} kg</span><small>${parseKey(w.d).toLocaleDateString('de-AT')}</small></span><button class="icon-btn" data-wdel="${w.d}" aria-label="löschen">${ICON.trash || '×'}</button></div>`).join('')}</div>` : ''}`,
+    mount(body) {
+      $('#wSave', body).onclick = () => {
+        const kg = parseFloat(String($('#wKg', body).value).replace(',', '.'));
+        if (!(kg > 20 && kg < 400)) { toast('Bitte ein gültiges Gewicht eingeben'); return; }
+        const d = $('#wDate', body).value || day;
+        db.weights = [...(db.weights || []).filter((w) => w.d !== d), { d, kg: Math.round(kg * 10) / 10 }];
+        const tg = parseFloat(String($('#wTarget', body).value).replace(',', '.'));
+        db.settings.targetWeight = tg > 20 ? tg : null;
+        if (d >= (weights().slice(-1)[0] || { d: '' }).d) db.settings.profile.weight = String(Math.round(kg * 10) / 10);
+        save(); render(); closeSheet(); toast('Gewicht gespeichert');
+      };
+      $$('[data-wdel]', body).forEach((b) => (b.onclick = () => { db.weights = (db.weights || []).filter((w) => w.d !== b.dataset.wdel); save(); render(); showView(viewWeight); }));
+    },
+  };
+}
+
+// ---------- Rezepte ----------
+const recipeTotals = (r) => totals((r.items || []).map((it) => (it.per100 ? { kcal: it.per100.kcal * it.grams / 100, p: it.per100.p * it.grams / 100, c: it.per100.c * it.grams / 100, f: it.per100.f * it.grams / 100 } : it)));
+function viewRecipes(meal) {
+  return () => {
+    const rs = (db.recipes || []).slice().sort((a, b) => a.name.localeCompare(b.name, 'de'));
+    return {
+      title: 'Meine Rezepte',
+      html: `<p class="hint" style="margin-top:0">Gerichte, die du öfter isst (z. B. „Mamas Gulasch“), einmal mit allen Zutaten anlegen – dann mit einem Tipp als Portion eintragen.</p>
+        ${rs.length ? `<div class="list">${rs.map((r) => { const t = recipeTotals(r); return `<button class="list-item" data-rec="${esc(r.id)}"><span class="info"><span class="name">${esc(r.name)}</span><small>${fmt(t.kcal / (r.servings || 1))} kcal pro Portion · ${(r.items || []).length} Zutaten</small></span></button>`; }).join('')}</div>` : '<div class="empty">Noch keine Rezepte.</div>'}
+        <button class="btn primary" id="rNew" style="margin-top:12px">+ Neues Rezept</button>`,
+      mount(body) {
+        $$('[data-rec]', body).forEach((b) => (b.onclick = () => pushView(viewRecipeEat((db.recipes || []).find((r) => r.id === b.dataset.rec), meal))));
+        $('#rNew', body).onclick = () => pushView(viewRecipeEdit(null));
+      },
+    };
+  };
+}
+function viewRecipeEat(r, meal) {
+  return () => {
+    if (!r) return null;
+    const t = recipeTotals(r); const per = { kcal: t.kcal / (r.servings || 1), p: t.p / (r.servings || 1), c: t.c / (r.servings || 1), f: t.f / (r.servings || 1) };
+    return {
+      title: r.name,
+      html: `<div class="card" style="box-shadow:none;background:var(--card-2)"><b>${fmt(per.kcal)} kcal</b> pro Portion <small class="muted">(${fmt(per.c)} g KH · ${fmt(per.p)} g Eiweiß · ${fmt(per.f)} g Fett)</small><br>
+          <small class="muted">Rezept für ${r.servings || 1} Portionen: ${esc((r.items || []).map((i) => `${fmt(i.grams)} ${i.unit || 'g'} ${i.name}`).join(', '))}</small></div>
+        <label class="field"><span>Wie viele Portionen?</span></label>
+        <div class="seg" id="rp">${[0.5, 1, 1.5, 2].map((p) => `<button type="button" data-p="${p}" class="${p === 1 ? 'on' : ''}">${String(p).replace('.', ',')}</button>`).join('')}</div>
+        ${segHtml(meal)}
+        <button class="btn primary" id="rAdd">Hinzufügen</button>
+        <button class="btn" id="rEdit">Rezept bearbeiten</button>`,
+      mount(body) {
+        let p = 1;
+        $$('#rp button', body).forEach((b) => (b.onclick = () => { p = +b.dataset.p; $$('#rp button', body).forEach((x) => x.classList.toggle('on', x === b)); }));
+        const getMeal = bindSeg(body, meal);
+        $('#rAdd', body).onclick = () => {
+          addEntry(getMeal(), { name: r.name, unit: 'Portion', grams: p, kcal: per.kcal * p, p: per.p * p, c: per.c * p, f: per.f * p, src: 'recipe' });
+          closeSheet(); toast(`${r.name} hinzugefügt`);
+        };
+        $('#rEdit', body).onclick = () => pushView(viewRecipeEdit(r.id));
+      },
+    };
+  };
+}
+function viewRecipeEdit(id) {
+  return () => {
+    const orig = id ? (db.recipes || []).find((r) => r.id === id) : null;
+    const r = orig ? JSON.parse(JSON.stringify(orig)) : { id: uid(), name: '', servings: 4, items: [] };
+    return {
+      title: id ? 'Rezept bearbeiten' : 'Neues Rezept', tall: true,
+      html: `<div class="grid2">
+          <label class="field"><span>Name</span><input class="input" id="reName" value="${esc(r.name)}" placeholder="z. B. Mamas Gulasch"></label>
+          <label class="field"><span>Ergibt Portionen</span><input class="input num" id="reServ" inputmode="numeric" value="${r.servings}"></label></div>
+        <div class="section-title">Zutaten</div><div id="reItems"></div>
+        <input class="input" id="reQ" type="search" placeholder="Zutat suchen … z. B. Rindfleisch, Zwiebel" autocomplete="off" style="margin-top:8px">
+        <div id="reRes"></div>
+        <div class="card" style="box-shadow:none;background:var(--card-2);margin-top:12px" id="reSum"></div>
+        <button class="btn primary" id="reSave">Rezept speichern</button>
+        ${id ? '<button class="btn danger" id="reDel">Rezept löschen</button>' : ''}`,
+      mount(body) {
+        const draw = () => {
+          $('#reItems', body).innerHTML = r.items.length ? `<div class="list">${r.items.map((it, i) => `<div class="list-item"><span class="info"><span class="name">${esc(it.name)}</span><small>${it.per100 ? `${fmt(it.per100.kcal * it.grams / 100)} kcal` : `${fmt(it.kcal)} kcal`}</small></span>
+            ${it.per100 ? `<input class="input num re-g" data-ig="${i}" inputmode="decimal" value="${fmtIn(it.grams)}"><span class="muted">${esc(it.unit || 'g')}</span>` : ''}
+            <button class="icon-btn" data-ix="${i}" aria-label="entfernen">×</button></div>`).join('')}</div>` : '<p class="hint">Noch keine Zutaten – unten suchen und antippen.</p>';
+          const t = recipeTotals(r); const s = Math.max(1, parseInt($('#reServ', body).value, 10) || 1);
+          $('#reSum', body).innerHTML = `Gesamt <b>${fmt(t.kcal)} kcal</b> · pro Portion <b>${fmt(t.kcal / s)} kcal</b>`;
+          $$('[data-ig]', body).forEach((el) => (el.onchange = () => { r.items[+el.dataset.ig].grams = parseFloat(el.value.replace(',', '.')) || 0; draw(); }));
+          $$('[data-ix]', body).forEach((b) => (b.onclick = () => { r.items.splice(+b.dataset.ix, 1); draw(); }));
+        };
+        const search = () => {
+          const q = $('#reQ', body).value.trim();
+          if (!q) { $('#reRes', body).innerHTML = ''; return; }
+          const rec = db.recent.filter((x) => norm(x.name).includes(norm(q))).slice(0, 4);
+          const hits = [...rec.map((x) => ({ ...x, recent: true })), ...matchFoods(q).slice(0, 8)];
+          $('#reRes', body).innerHTML = hits.length ? `<div class="list">${hits.map((h, i) => `<button class="list-item" data-hit="${i}"><span class="info"><span class="name">${esc(h.name)}</span><small>${h.per100 ? `${fmt(h.per100.kcal)} kcal / 100 ${esc(h.unit || 'g')}` : `${fmt(h.kcal)} kcal`}${h.recent ? ' · zuletzt gegessen' : ''}</small></span><span class="val">+</span></button>`).join('')}</div>` : '<p class="hint">Nichts gefunden – du kannst die Zutat auch über „Manuell“ einmal eintragen.</p>';
+          $$('[data-hit]', body).forEach((b) => (b.onclick = () => {
+            const h = hits[+b.dataset.hit];
+            r.items.push(h.per100 ? { name: h.name, unit: h.unit || 'g', grams: (h.servings && h.servings[0] && h.servings[0].g) || h.grams || 100, per100: h.per100 } : { name: h.name, unit: h.unit || 'g', grams: h.grams || 0, kcal: h.kcal, p: h.p, c: h.c, f: h.f });
+            $('#reQ', body).value = ''; $('#reRes', body).innerHTML = ''; draw();
+          }));
+        };
+        $('#reQ', body).oninput = search;
+        $('#reServ', body).oninput = draw;
+        draw();
+        $('#reSave', body).onclick = () => {
+          r.name = $('#reName', body).value.trim();
+          r.servings = Math.max(1, parseInt($('#reServ', body).value, 10) || 1);
+          if (!r.name) { toast('Bitte einen Namen eingeben'); return; }
+          if (!r.items.length) { toast('Bitte mindestens eine Zutat hinzufügen'); return; }
+          db.recipes = [...(db.recipes || []).filter((x) => x.id !== r.id), r];
+          save(); toast('Rezept gespeichert'); backView();
+        };
+        const del = $('#reDel', body);
+        if (del) del.onclick = () => { if (!confirm('Rezept löschen?')) return; db.recipes = (db.recipes || []).filter((x) => x.id !== r.id); save(); closeSheet(); toast('Gelöscht'); };
+      },
+    };
+  };
+}
+
+// ---------- Sicherungs-Erinnerung ----------
+function renderBackupHint() {
+  const el = $('#backupHint'); if (!el) return;
+  const days = Object.keys(db.log || {}).length;
+  const last = db.lastBackup || null;
+  const due = days >= 7 && (!last || (Date.now() - last) > 30 * 86400000);
+  el.hidden = !due;
+  if (!due) return;
+  el.innerHTML = `<b>💾 Zeit für eine Sicherung</b><p>${last ? `Letzte Sicherung vor ${Math.floor((Date.now() - last) / 86400000)} Tagen.` : 'Deine Einträge sind nur auf diesem Handy gespeichert.'} Speichere sie einmal im Monat, z. B. per E-Mail an dich selbst.</p>
+    <div class="water-btns"><button class="btn small" id="bLater">Später</button><button class="btn small primary" id="bNow">Jetzt sichern</button></div>`;
+  $('#bNow', el).onclick = () => { exportBackup(); };
+  $('#bLater', el).onclick = () => { db.lastBackup = Date.now() - 23 * 86400000; save(); renderBackupHint(); };
+}
+async function exportBackup() {
+  const data = { ...db, settings: { ...db.settings, apiKey: '' }, exported: new Date().toISOString(), app: 'kalorien', version: VERSION };
+  const name = `kalorien-backup-${todayKey()}.json`;
+  const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+  db.lastBackup = Date.now(); save(); renderBackupHint();
+  try {
+    const file = new File([blob], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Kalorien-Backup' }); return; }
+  } catch (e) { if (e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
 
 // ---------- Toast ----------
 let toastTimer;
@@ -349,12 +558,13 @@ function viewAdd(meal) {
         <button class="tile" data-go="scan">${ICON.barcode}<b>Barcode</b><small>Verpacktes Produkt scannen</small></button>
         <button class="tile" data-go="search">${ICON.search}<b>Suchen</b><small>Lebensmittel & Produkte</small></button>
         <button class="tile" data-go="manual">${ICON.pencil}<b>Manuell</b><small>Kalorien selbst eingeben</small></button>
+        <button class="tile wide" data-go="recipes">📖<b>Meine Rezepte</b><small>Eigene Gerichte als Portion eintragen</small></button>
       </div>
       <div class="section-title">Zuletzt gegessen</div>
       ${db.recent.length ? `<div class="list">${db.recent.slice(0, 15).map((r, i) => listItemHtml(r, i)).join('')}</div>`
         : '<div class="empty">Hier erscheinen deine zuletzt eingetragenen Lebensmittel.</div>'}`,
     mount(body) {
-      const go = { photo: viewPhoto, scan: viewScan, search: viewSearch, manual: (m) => viewManual(m) };
+      const go = { photo: viewPhoto, scan: viewScan, search: viewSearch, manual: (m) => viewManual(m), recipes: (m) => viewRecipes(m) };
       $$('[data-go]', body).forEach((b) => (b.onclick = () => pushView(go[b.dataset.go](meal))));
       $$('.list-item', body).forEach((b) => (b.onclick = () => pushView(viewFromRecent(db.recent[+b.dataset.idx], meal))));
     },
@@ -1100,6 +1310,7 @@ function viewSettings() {
 
       <div class="section-title">Daten</div>
       <div class="panel">
+        <label class="field"><span>Wasser-Ziel (Liter pro Tag)</span><input class="input num" id="sWater" inputmode="decimal" value="${fmtIn(db.settings.waterGoal || 2.5)}"></label>
         <button class="btn" id="sExport">Backup exportieren</button>
         <button class="btn" id="sImport">Backup importieren</button>
         <input type="file" id="sImportFile" accept="application/json,.json" hidden>
@@ -1150,6 +1361,7 @@ function viewSettings() {
         } finally { db.settings.apiKey = oldKey; db.settings.model = oldModel; }
       };
       $('#sExport', body).onclick = async () => {
+        db.lastBackup = Date.now(); save();
         const data = { ...db, settings: { ...db.settings, apiKey: '' }, exported: new Date().toISOString(), app: 'kalorien', version: VERSION };
         const name = `kalorien-backup-${todayKey()}.json`;
         const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
@@ -1195,6 +1407,7 @@ function viewSettings() {
           ...db.settings, goal, split,
           profile: { sex: v('#sSex'), age: v('#sAge'), height: v('#sHeight'), weight: v('#sWeight'), activity: +v('#sAct'), goalType: +v('#sGoalType') },
           apiKey: v('#sKey').trim(), model,
+          waterGoal: Math.min(6, Math.max(0.5, num(v('#sWater')) || 2.5)),
         };
         save(); render();
         toast('Gespeichert');

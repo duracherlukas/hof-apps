@@ -1,7 +1,10 @@
 /* Gemeinsamer Code für Gästeseite und Verwaltung. */
 (() => {
 const G = (window.G = {});
-G.VERSION = '1.0';
+G.VERSION = '1.2';
+G.hash = (s) => { let h = 5381; const t = String(s || ''); for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+const T = (k, v) => (G.t ? G.t(k, v) : k);
+const LOC = () => (G.LOCALES && G.LOCALES[G.lang]) || 'de-AT';
 
 // ---------- Helfer ----------
 G.$ = (s, r = document) => r.querySelector(s);
@@ -49,24 +52,24 @@ G.earliestDelivery = (cutoff) => {
 };
 G.fmtDay = (day, opts = { weekday: 'long', day: 'numeric', month: 'long' }) => {
   const [y, m, d] = day.split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('de-AT', { ...opts, timeZone: 'UTC' });
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(LOC(), { ...opts, timeZone: 'UTC' });
 };
 G.relDay = (day) => {
   const t = G.today();
-  if (day === t) return 'heute';
-  if (day === G.addDays(t, 1)) return 'morgen';
-  if (day === G.addDays(t, 2)) return 'übermorgen';
-  if (day === G.addDays(t, -1)) return 'gestern';
+  if (day === t) return T('today');
+  if (day === G.addDays(t, 1)) return T('tomorrow');
+  if (day === G.addDays(t, 2)) return T('dayAfter');
+  if (day === G.addDays(t, -1)) return T('yesterday');
   return '';
 };
 G.fmtDayRel = (day) => { const r = G.relDay(day); const f = G.fmtDay(day, { weekday: 'short', day: 'numeric', month: 'numeric' }); return r ? `${r[0].toUpperCase() + r.slice(1)}, ${f}` : G.fmtDay(day); };
-G.fmtDeadline = (ms) => { const day = G.dayKey(ms); const r = G.relDay(day); return `${r || G.fmtDay(day, { weekday: 'short', day: 'numeric', month: 'numeric' })} um ${G.timeOf(ms)} Uhr`; };
+G.fmtDeadline = (ms) => { const day = G.dayKey(ms); const r = G.relDay(day); return `${r || G.fmtDay(day, { weekday: 'short', day: 'numeric', month: 'numeric' })} ${T('at')} ${G.timeOf(ms)}${T('oclock')}`; };
 G.countdown = (ms) => {
   const mins = Math.max(0, Math.round(ms / 60000));
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  if (h >= 24) return `${Math.floor(h / 24)} ${Math.floor(h / 24) === 1 ? 'Tag' : 'Tagen'}`;
-  return h ? `${h} Std. ${m} Min.` : `${m} Min.`;
+  if (h >= 24) return `${Math.floor(h / 24)} ${Math.floor(h / 24) === 1 ? T('day1') : T('days')}`;
+  return h ? `${h} ${T('hours')} ${m} ${T('minutes')}` : `${m} ${T('minutes')}`;
 };
 
 // ---------- Text-Formatierung (einfach) ----------
@@ -138,6 +141,7 @@ G.ICON = {
   edit: '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>',
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg>',
   list: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  cal: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
   book: '<svg viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5"/></svg>',
 };
 G.SECTION_ICONS = ['home', 'key', 'wifi', 'rules', 'recycle', 'sos', 'map', 'mountain', 'egg', 'bread', 'car', 'phone', 'info', 'book', 'euro'];
@@ -145,7 +149,7 @@ G.SECTION_ICONS = ['home', 'key', 'wifi', 'rules', 'recycle', 'sos', 'map', 'mou
 // ---------- Startinhalte: drei Betriebe der Familie Herzog ----------
 const NOTRUF = '- **112** – Euro-Notruf\n- **144** – Rettung\n- **122** – Feuerwehr\n- **133** – Polizei\n- **140** – Bergrettung / Alpinnotruf\n- **141** – Ärztenotdienst\n- **1450** – Gesundheitsberatung';
 const HOCHKOENIG_CARD = 'Mit der **Hochkönig Card** habt ihr als unsere Gäste viele Vorteile:\n\n**Sommer**\n- Unbegrenzt gratis mit den Bergbahnen in Maria Alm, Hintermoos, Hinterthal, Dienten und Mühlbach\n- Freier Eintritt ins Freibad Maria Alm und Mühlbach\n\n**Winter**\n- Einmal gratis Nachtskifahren in Maria Alm\n- Gratis GoPro-Helmkamera-Verleih\n- Weitere Ermäßigungen in der Region\n\nFragt uns einfach nach eurer Karte.';
-const FLEISCH_LISTE = '- **Beiried-Steak** – € 45 / kg\n- **Hüftsteak** – € 40 / kg\n- **Schnitzel** – € 30 / kg\n- **Rinderbraten** – € 20 / kg\n- **Gulasch** – € 15 / kg\n- **Faschiertes** – € 15 / kg\n- **Mischpaket 10 kg** (verschiedene Sorten) – € 180\n\nAlles ist **vakuumiert und tiefgekühlt** – perfekt zum Mitnehmen oder für euren Aufenthalt.\n\nFragt uns gerne – wir beraten euch!';
+const FLEISCH_LISTE = '- **Beiried-Steak** – € 45 / kg\n- **Hüftsteak** – € 40 / kg\n- **Schnitzel** – € 30 / kg\n- **Rinderbraten** – € 20 / kg\n- **Gulasch** – € 15 / kg\n- **Faschiertes** – € 15 / kg\n- **Mischpaket 10 kg** (verschiedene Sorten) – € 180\n\nAlles ist **vakuumiert und tiefgekühlt** – perfekt zum Mitnehmen oder für euren Aufenthalt. Ihr könnt es auch hier in der App zusammen mit dem Frühstück bestellen.\n\nFragt uns gerne – wir beraten euch!';
 const fleisch = (intro) => ({ id: 'fleisch', icon: 'euro', title: 'Fleisch vom Stegerbauer', text: intro + '\n\n' + FLEISCH_LISTE });
 const MUELL = 'Bitte trennt euren Müll – danke! Die Tonnen findet ihr [hier eintragen].\n\n- **Restmüll** – schwarze Tonne\n- **Bio** – braune Tonne\n- **Papier** – rote Tonne\n- **Plastik & Metall** – gelber Sack\n- **Glas** – [hier eintragen]';
 
@@ -158,6 +162,7 @@ G.defaultProperties = () => [
     whatsapp: '',
     email: 'stegerbauer@sbg.at',
     website: 'https://www.urlaub-hochkoenig.at/',
+    lat: 47.3979, lng: 12.9029, reviewUrl: '',
     deliveryText: 'Wir bringen euch das Gebäck in der Früh vor die Wohnung bzw. zu eurem Wohnmobil.',
     sections: [
       { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr bei uns am **Bio-Bauernhof Stegerbauer** in Maria Alm seid!\n\nKomfortable Ferienwohnungen mit viel Herz und Blick auf die Berge – der perfekte Ort für erholsame Tage zu jeder Jahreszeit.\n\nHier findet ihr alles Wichtige für euren Urlaub. Wenn etwas fehlt oder nicht passt, meldet euch jederzeit bei uns – wir helfen gerne.\n\nEure Familie Herzog' },
@@ -182,6 +187,7 @@ G.defaultProperties = () => [
     whatsapp: '',
     email: 'stegerbauer@sbg.at',
     website: 'https://www.almhuette-hochkoenig.at/',
+    lat: 47.3833, lng: 13.0000, reviewUrl: '',
     deliveryText: 'Brötchenservice in der Wintersaison – wir bringen euch das Gebäck in der Früh zur Hütte.',
     sections: [
       { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr auf der **Nösslau Alm** seid!\n\nEure Hütte liegt auf rund **1.220 m** etwas außerhalb von Dienten am Hochkönig – in ruhiger, sonniger Alleinlage mit Aussicht.\n\nUnsere urige Alm für Selbstversorger ist ideal für Familien, Freunde oder Vereine (10 bis 15 Personen) – Natur pur und unvergessliche Momente in den Bergen.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
@@ -204,6 +210,7 @@ G.defaultProperties = () => [
     whatsapp: '',
     email: 'stegerbauer@sbg.at',
     website: 'https://www.ferienhaus-dienten.at/',
+    lat: 47.3833, lng: 13.0000, reviewUrl: '',
     deliveryText: 'Brötchenservice in der Wintersaison – wir bringen euch das Gebäck in der Früh zum Haus.',
     sections: [
       { id: 'willkommen', icon: 'home', title: 'Herzlich willkommen', text: 'Schön, dass ihr im **Selbstversorgerhaus Schoberhof** seid!\n\nDas Haus liegt auf rund **1.100 m**, etwa 3 km von Dienten am Hochkönig – ruhig und sonnig, mitten in Wiesen und Wäldern. Hier können die Kinder frei herumtollen.\n\nViel Platz für gemeinsame Zeit (15 bis 23 Personen) – perfekt für Gruppen, Erholung und ruhige Momente.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog' },
@@ -221,14 +228,24 @@ G.defaultProperties = () => [
   },
 ];
 
+// Fleisch vom Stegerbauer (Preis pro kg, Menge in kg)
+const MEAT_PRODUCTS = [
+  { id: 'beiried', name: 'Beiried-Steak', price: 45, group: 'fleisch', unit: 'kg', active: true },
+  { id: 'huefte', name: 'Hüftsteak', price: 40, group: 'fleisch', unit: 'kg', active: true },
+  { id: 'schnitzel', name: 'Schnitzel', price: 30, group: 'fleisch', unit: 'kg', active: true },
+  { id: 'braten', name: 'Rinderbraten', price: 20, group: 'fleisch', unit: 'kg', active: true },
+  { id: 'gulasch', name: 'Gulasch', price: 15, group: 'fleisch', unit: 'kg', active: true },
+  { id: 'faschiertes', name: 'Faschiertes', price: 15, group: 'fleisch', unit: 'kg', active: true },
+  { id: 'mischpaket', name: 'Mischpaket 10 kg (verschiedene Sorten)', price: 180, group: 'fleisch', unit: '', active: true },
+];
 G.defaultSite = () => ({
   hofName: 'Familie Herzog',
   breakfast: true,
   cutoffHour: 17,
   bakeryName: '',
   bakeryPhone: '',
-  properties: G.defaultProperties(),
-  contentVersion: 2,
+  properties: G.applyDefaultTranslations ? G.applyDefaultTranslations(G.defaultProperties()) : G.defaultProperties(),
+  contentVersion: 3,
   products: [
     // Gebäck
     { id: 'vollkorn', name: 'Vollkornweckerl', price: 1.8, group: 'baecker', cat: 'Gebäck', active: true },
@@ -256,7 +273,8 @@ G.defaultSite = () => ({
     // Vom Hof
     { id: 'eier', name: 'Bio-Eier von unseren Hühnern (6 Stück)', price: 3.0, group: 'hof', active: true },
     { id: 'marmelade', name: 'Hausgemachte Marmelade', price: 4.5, group: 'hof', active: false },
-  ],
+    ...MEAT_PRODUCTS,
+  ].map((p) => (G.applyProductTranslations ? G.applyProductTranslations([p])[0] : p)),
 });
 G.defaultUnits = () => [
   { name: 'Ferienwohnung Schwalbenwand', property: 'stegerbauer', breakfast: true, askSpot: false, wlanName: '', wlanPassword: '', note: '' },
@@ -333,9 +351,43 @@ G.migrateUnits = (units) => {
 // Nur was noch genau dem alten Vorschlag entspricht, wird ersetzt – eigene Änderungen bleiben.
 const V1 = {"props":{"stegerbauer":{"fields":{"subtitle":"Urlaub am Bauernhof in Maria Alm"},"sections":{"willkommen":{"id":"willkommen","icon":"home","title":"Herzlich willkommen","text":"Schön, dass ihr bei uns am **Bio-Bauernhof Stegerbauer** in Maria Alm seid!\n\nHier findet ihr alles Wichtige für euren Urlaub. Wenn etwas fehlt oder nicht passt, meldet euch jederzeit bei uns – wir helfen gerne.\n\nEure Familie Herzog"},"wohnung":{"id":"wohnung","icon":"home","title":"Eure Ferienwohnung","text":"- **WLAN** gratis – Name und Passwort stehen oben\n- Kabel-TV, Safe\n- Küche mit Herd, Geschirrspüler, Mikrowelle, Kühlschrank mit Gefrierfach, Kaffeemaschine und Wasserkocher\n- Balkon\n- Für die Kleinsten: **Babybett, Wickelauflage und Babybadewanne** – sagt uns einfach Bescheid"},"stellplatz":{"id":"stellplatz","icon":"car","title":"Wohnmobil-Stellplatz","text":"- Strom, Frischwasser und Entsorgung direkt am Platz\n- Ganzjährig geöffnet\n- Ins Ortszentrum sind es ca. 10 Minuten\n- Frische Semmeln könnt ihr hier in der App für den nächsten Morgen bestellen"}}},"alm":{"fields":{"subtitle":"Selbstversorger-Almhütte in Dienten am Hochkönig"},"sections":{"willkommen":{"id":"willkommen","icon":"home","title":"Herzlich willkommen","text":"Schön, dass ihr auf der **Nösslau Alm** seid!\n\nEure Hütte liegt auf rund **1.220 m** etwas außerhalb von Dienten am Hochkönig – in ruhiger, sonniger Alleinlage mit Aussicht. Genießt die Zeit auf der Alm!\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog"}}},"schoberhof":{"fields":{"subtitle":"Gruppenhaus in Dienten am Hochkönig"},"sections":{"willkommen":{"id":"willkommen","icon":"home","title":"Herzlich willkommen","text":"Schön, dass ihr im **Selbstversorgerhaus Schoberhof** seid!\n\nDas Haus liegt auf rund **1.100 m**, etwa 3 km von Dienten am Hochkönig – ruhig und sonnig, mitten in Wiesen und Wäldern. Hier können die Kinder frei herumtollen.\n\nWenn ihr etwas braucht, meldet euch jederzeit bei uns.\n\nEure Familie Herzog"}}}},"products":[{"id":"semmel","name":"Semmel","price":0.6,"group":"baecker","active":true},{"id":"kornspitz","name":"Kornspitz","price":1,"group":"baecker","active":true},{"id":"vollkorn","name":"Vollkornweckerl","price":0.9,"group":"baecker","active":true},{"id":"croissant","name":"Croissant","price":1.4,"group":"baecker","active":true},{"id":"brot","name":"Bauernbrot (½ Laib)","price":2.9,"group":"baecker","active":true},{"id":"eier","name":"Bio-Eier von unseren Hühnern (6 Stück)","price":3,"group":"hof","active":true},{"id":"marmelade","name":"Hausgemachte Marmelade","price":4.5,"group":"hof","active":false}]};
 const NEW_IN_V2 = ['fleisch'];
-G.CONTENT_VERSION = 2;
+G.CONTENT_VERSION = 3;
 G.upgradeSite = (site) => {
   if (!site || !Array.isArray(site.properties) || !site.properties.length || (site.contentVersion || 1) >= G.CONTENT_VERSION) return null;
+  let s = site;
+  if ((s.contentVersion || 1) < 2) s = upgradeV2(s);
+  if ((s.contentVersion || 1) < 3) s = upgradeV3(s);
+  return s;
+};
+// Version 3: Fleisch bestellen, Englisch/Niederländisch, Wetter-Standort
+const V2_FLEISCH = {"stegerbauer": "Bestes Fleisch von unseren eigenen Tieren – mit viel Sorgfalt aufgezogen und in bester Qualität.\n\n- **Beiried-Steak** – € 45 / kg\n- **Hüftsteak** – € 40 / kg\n- **Schnitzel** – € 30 / kg\n- **Rinderbraten** – € 20 / kg\n- **Gulasch** – € 15 / kg\n- **Faschiertes** – € 15 / kg\n- **Mischpaket 10 kg** (verschiedene Sorten) – € 180\n\nAlles ist **vakuumiert und tiefgekühlt** – perfekt zum Mitnehmen oder für euren Aufenthalt.\n\nFragt uns gerne – wir beraten euch!", "alm": "Bestes Fleisch von unseren eigenen Tieren vom **Bio-Bauernhof Stegerbauer** in Maria Alm – ideal zum Grillen und Kochen auf der Hütte.\n\n- **Beiried-Steak** – € 45 / kg\n- **Hüftsteak** – € 40 / kg\n- **Schnitzel** – € 30 / kg\n- **Rinderbraten** – € 20 / kg\n- **Gulasch** – € 15 / kg\n- **Faschiertes** – € 15 / kg\n- **Mischpaket 10 kg** (verschiedene Sorten) – € 180\n\nAlles ist **vakuumiert und tiefgekühlt** – perfekt zum Mitnehmen oder für euren Aufenthalt.\n\nFragt uns gerne – wir beraten euch!", "schoberhof": "Bestes Fleisch von unseren eigenen Tieren vom **Bio-Bauernhof Stegerbauer** in Maria Alm – ideal für die große Runde.\n\n- **Beiried-Steak** – € 45 / kg\n- **Hüftsteak** – € 40 / kg\n- **Schnitzel** – € 30 / kg\n- **Rinderbraten** – € 20 / kg\n- **Gulasch** – € 15 / kg\n- **Faschiertes** – € 15 / kg\n- **Mischpaket 10 kg** (verschiedene Sorten) – € 180\n\nAlles ist **vakuumiert und tiefgekühlt** – perfekt zum Mitnehmen oder für euren Aufenthalt.\n\nFragt uns gerne – wir beraten euch!"};
+const TR_KEYS = ['title_en', 'text_en', 'title_nl', 'text_nl', 'trSrc'];
+function upgradeV3(site) {
+  const fresh = G.defaultSite();
+  const properties = site.properties.map((p) => {
+    const f = fresh.properties.find((x) => x.id === p.id);
+    if (!f) return p;
+    const np = { ...p };
+    ['lat', 'lng'].forEach((k) => { if (np[k] == null) np[k] = f[k]; });
+    if (np.reviewUrl == null) np.reviewUrl = '';
+    ['subtitle', 'deliveryText'].forEach((k) => { if ((p[k] || '') === (f[k] || '') && !p[k + '_en']) { np[k + '_en'] = f[k + '_en']; np[k + '_nl'] = f[k + '_nl']; } });
+    np.sections = (p.sections || []).map((x) => {
+      const fs = f.sections.find((y) => y.id === x.id);
+      if (!fs) return x;
+      if (x.id === 'fleisch' && x.text === V2_FLEISCH[p.id]) return { ...fs, title: x.title, icon: x.icon };
+      if (sameSection(x, fs) && !x.title_en) { const add = {}; TR_KEYS.forEach((k) => { if (fs[k] != null) add[k] = fs[k]; }); return { ...x, ...add }; }
+      return x;
+    });
+    return np;
+  });
+  let products = (site.products || []).map((pr) => {
+    const fp = fresh.products.find((x) => x.id === pr.id);
+    return fp && fp.name === pr.name && !pr.name_en ? { ...pr, name_en: fp.name_en, name_nl: fp.name_nl } : pr;
+  });
+  if (!products.some((pr) => pr.group === 'fleisch')) products = [...products, ...fresh.products.filter((pr) => pr.group === 'fleisch')];
+  return { ...site, properties, products, contentVersion: 3 };
+}
+function upgradeV2(site) {
   const fresh = G.defaultSite();
   const properties = site.properties.map((p) => {
     const f = fresh.properties.find((x) => x.id === p.id);
@@ -357,8 +409,8 @@ G.upgradeSite = (site) => {
   });
   const prods = site.products || [];
   const products = !prods.length || sameProducts(prods, V1.products) || sameProducts(prods, LEGACY_PRODUCTS) ? fresh.products : prods;
-  return { ...site, properties, products, contentVersion: G.CONTENT_VERSION };
-};
+  return { ...site, properties, products, contentVersion: 2 };
+}
 
 // ---------- Datenspeicher ----------
 const FB = 'https://www.gstatic.com/firebasejs/13.1.0';
@@ -417,6 +469,11 @@ async function firebaseStore(fbc, opts) {
     },
     updateOrder(id, patch) { fs.updateDoc(fs.doc(ordersCol, id), clean(patch)).catch(fail); },
     deleteOrder(id) { fs.deleteDoc(fs.doc(ordersCol, id)).catch(fail); },
+
+    // Belegung (nur für angemeldete Hof-Mitglieder)
+    watchBookings(cb) { return fs.onSnapshot(fs.collection(db, 'bookings'), (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }))), fail); },
+    saveBooking(id, data) { fs.setDoc(fs.doc(db, 'bookings', id), clean(data)).catch(fail); return id; },
+    deleteBooking(id) { fs.deleteDoc(fs.doc(db, 'bookings', id)).catch(fail); },
   };
 }
 
@@ -431,11 +488,12 @@ function demoStore() {
     return fresh;
   };
   let data = load();
-  const subs = { site: new Set(), units: new Set(), orders: new Set() };
+  const subs = { site: new Set(), units: new Set(), orders: new Set(), bookings: new Set() };
   const emit = () => {
     subs.site.forEach((cb) => cb(data.site));
     subs.units.forEach((cb) => cb(Object.values(data.units)));
     subs.orders.forEach(({ since, cb }) => cb(Object.values(data.orders).filter((o) => o.date >= since)));
+    subs.bookings.forEach((cb) => cb(Object.values(data.bookings || {})));
   };
   const persist = () => { G.store(KEY, data); emit(); };
   window.addEventListener('storage', (e) => { if (e.key === KEY) { data = load(); emit(); } });
@@ -467,10 +525,14 @@ function demoStore() {
     watchOrders(since, cb) { return sub(subs.orders, { since, cb }); },
     updateOrder(id, patch) { if (data.orders[id]) { Object.assign(data.orders[id], clean(patch)); persist(); } },
     deleteOrder(id) { delete data.orders[id]; persist(); },
+    watchBookings(cb) { return sub(subs.bookings, cb); },
+    saveBooking(id, b) { data.bookings = data.bookings || {}; data.bookings[id] = { ...clean(b), id }; persist(); return id; },
+    deleteBooking(id) { if (data.bookings) delete data.bookings[id]; persist(); },
   };
 }
 
 // Summen einer Bestellung
 G.orderTotal = (o) => (o.items || []).reduce((s, it) => s + (it.qty || 0) * (it.price || 0), 0);
-G.orderItemsText = (o) => (o.items || []).map((it) => `${it.qty} × ${it.name}`).join(', ');
+G.itemText = (it, name) => `${it.qty}${it.unit === 'kg' ? ' kg' : ' ×'} ${name || it.name}`;
+G.orderItemsText = (o, nameOf) => (o.items || []).map((it) => G.itemText(it, nameOf ? nameOf(it) : it.name)).join(', ');
 })();

@@ -41,18 +41,37 @@
   <div class="rec-panel">
     <div class="rec-status" id="recStatus">GPS wird gesucht …</div>
     <div class="rec-stats">
-      <div><b class="num" id="rTime">0:00</b><small>Zeit</small></div>
+      <div><b class="num" id="rTime">0:00</b><small>Gehzeit</small></div>
       <div><b class="num" id="rDist">0,0</b><small>km</small></div>
       <div><b class="num" id="rUp">0</b><small>Hm ↑</small></div>
       <div><b class="num" id="rAlt">–</b><small>Höhe</small></div>
     </div>
-    <p class="rec-hint" id="recHint">Lass die App offen – der Bildschirm bleibt an. Handy einfach in die Tasche stecken.</p>
+    <div class="rec-pause" id="rPauseInfo"></div>
+    <div class="rec-nav" id="rNavInfo" hidden></div>
+    <div class="rec-tools">
+      <button class="btn small" id="rBack"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Zum Start</button>
+      <button class="btn small" id="rRoute"><svg viewBox="0 0 24 24"><path d="M4 18L10 9l5 5 5-9"/></svg>Route laden</button>
+      <input type="file" id="rRouteFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>
+    </div>
+    <button class="btn lock-btn" id="rLock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Sperren &amp; einstecken</button>
+    <p class="rec-hint" id="recHint">Vor dem Einstecken auf „Sperren“ tippen – das GPS läuft weiter. Bitte <b>nicht</b> die Ein/Aus-Taste drücken.</p>
     <div class="rec-btns">
       <button class="btn" id="rPause">Pause</button>
       <button class="btn primary" id="rStop">Beenden</button>
     </div>
   </div>
 </section>
+
+<!-- Taschen-Sperre: schwarzer Bildschirm, Berührungen werden ignoriert -->
+<div id="lock" class="lock" hidden aria-label="Bildschirm gesperrt">
+  <div class="lock-stats"><b class="num" id="lTime">0:00</b><span id="lDist">0,0 km</span></div>
+  <div class="lock-status" id="lStatus"></div>
+  <div class="lock-hold" id="lHold" role="button" aria-label="Zum Entsperren 2 Sekunden gedrückt halten">
+    <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="track"/><circle cx="50" cy="50" r="44" class="prog" id="lProg"/></svg>
+    <svg class="ic" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+  </div>
+  <p class="lock-text" id="lText">Zum Entsperren den Kreis<br>2 Sekunden gedrückt halten</p>
+</div>
 
 <div class="overlay" id="overlay" hidden></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden>

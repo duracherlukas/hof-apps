@@ -79,6 +79,17 @@ async function firebaseStore(fbc, onError) {
       return ref.id;
     },
     deleteEntry(id) { fs.deleteDoc(fs.doc(entriesCol, id)).catch(fail); },
+    // Fotos zu Maschinen und Einträgen
+    async listPhotos(machineId) {
+      const snap = await fs.getDocs(fs.query(fs.collection(db, 'mphotos'), fs.where('machineId', '==', machineId)));
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+    },
+    async addPhoto(data) { const ref = fs.doc(fs.collection(db, 'mphotos')); await fs.setDoc(ref, clean(data)); return ref.id; },
+    async deletePhoto(id) { await fs.deleteDoc(fs.doc(db, 'mphotos', id)); },
+    // Flächen aus der Hof-Karte (nur lesen)
+    subscribeFeatures(cb) {
+      return fs.onSnapshot(fs.collection(db, 'features'), (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }))), () => cb([]));
+    },
   };
 }
 
@@ -126,6 +137,21 @@ function demoStore() {
       return key;
     },
     deleteEntry(eid) { delete data.entries[eid]; persist(); },
+    async listPhotos(mid) { try { return Object.values(JSON.parse(localStorage.getItem('hofmaschinen_photos')) || {}).filter((p) => p.machineId === mid).sort((a, b) => a.createdAt - b.createdAt); } catch (e) { return []; } },
+    async addPhoto(p) {
+      let all = {}; try { all = JSON.parse(localStorage.getItem('hofmaschinen_photos')) || {}; } catch (e) { /* */ }
+      const pid = id(); all[pid] = { ...clean(p), id: pid };
+      try { localStorage.setItem('hofmaschinen_photos', JSON.stringify(all)); } catch (e) { throw Object.assign(new Error('Speicher voll'), { code: 'quota' }); }
+      return pid;
+    },
+    async deletePhoto(pid) { let all = {}; try { all = JSON.parse(localStorage.getItem('hofmaschinen_photos')) || {}; } catch (e) { /* */ } delete all[pid]; try { localStorage.setItem('hofmaschinen_photos', JSON.stringify(all)); } catch (e) { /* */ } },
+    subscribeFeatures(cb) {
+      const read = () => { try { const d = JSON.parse(localStorage.getItem('hofkarte_demo')); return d && d.features ? Object.values(d.features) : []; } catch (e) { return []; } };
+      setTimeout(() => cb(read()), 0);
+      const on = (e) => { if (e.key === 'hofkarte_demo') cb(read()); };
+      window.addEventListener('storage', on);
+      return () => window.removeEventListener('storage', on);
+    },
   };
 }
 

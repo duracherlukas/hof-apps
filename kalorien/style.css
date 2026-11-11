@@ -244,3 +244,24 @@ textarea.input { resize: vertical; min-height: 64px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Wasser, Gewicht, Rezepte */
+.water-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.water-head h3 { margin: 0 0 8px; font-size: 16px; }
+.glasses { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.glass { width: 26px; height: 32px; border: 2px solid #4a90d9; border-top: 0; border-radius: 0 0 8px 8px; background: transparent; padding: 0; }
+.glass.full { background: linear-gradient(to top, #4a90d9 85%, transparent 85%); }
+.water-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.water-btns .btn { width: auto; margin: 0; }
+.wchart { width: 100%; height: auto; display: block; margin-top: 8px; }
+.wline { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+.wdot { fill: var(--accent); }
+.week-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; text-align: center; }
+.week-stats div { background: var(--card-2, rgba(0,0,0,.04)); border-radius: 12px; padding: 8px 4px; }
+.week-stats b { display: block; font-size: 17px; }
+.week-stats small { color: var(--muted); font-size: 12px; }
+.tile.wide { grid-column: 1 / -1; }
+.re-g { width: 74px; min-height: 38px; padding: 6px 8px; text-align: right; }
+.backup-hint { border: 2px dashed var(--accent); }
+.backup-hint p { margin: 6px 0 10px; color: var(--muted); font-size: 14px; }
+.btn.small { width: auto; padding: 9px 14px; font-size: 14px; min-height: 0; }

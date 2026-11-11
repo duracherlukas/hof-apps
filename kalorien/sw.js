@@ -1,6 +1,6 @@
 // Service Worker: hält die App-Dateien offline verfügbar.
 // Nach einem Update der App-Dateien die Versionsnummer erhöhen.
-const CACHE = 'kalorien-v2';
+const CACHE = 'kalorien-v3';
 const FILES = ['./', 'index.html', 'style.css', 'app.js', 'foods.js', 'manifest.webmanifest', 'vendor/zxing.min.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 

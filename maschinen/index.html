@@ -42,6 +42,7 @@
 
 <div id="app" hidden>
   <header class="topbar">
+    <a class="icon-btn" href="../" aria-label="Alle Hof-Apps" title="Alle Hof-Apps" style="color:inherit;margin-left:-8px"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></a>
     <div class="title">
       <h1 id="hofName">Hof-Maschinen</h1>
       <small id="syncState"></small>
@@ -64,6 +65,9 @@
     </button>
     <button class="fab" id="fab" aria-label="Neuer Eintrag">
       <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+    <button class="tab" data-tab="ernte">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0"/></svg><span>Ernte</span>
     </button>
     <button class="tab" data-tab="costs">
       <svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Kosten</span>
@@ -88,8 +92,11 @@
   <div class="sheet-body" id="sheetBody"></div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="viewer" id="viewer" hidden><img id="viewerImg" alt=""><button class="vclose" id="viewerClose" aria-label="Schließen"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+<div id="printArea"></div>
 
 <script src="config.js"></script>
+<script src="vendor/qrcode.js"></script>
 <script src="store.js"></script>
 <script src="app.js"></script>
 </body>

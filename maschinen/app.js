@@ -3,10 +3,17 @@
 const createStore = window.createStore;
 
 const CFG = window.HOF_CONFIG || {};
-const VERSION = '1.0';
+const VERSION = '1.2';
 
 // ---------- Icons ----------
 const I = {
+  camera: '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  print: '<svg viewBox="0 0 24 24"><path d="M7 9V3h10v6M7 17H4v-7h16v7h-3M7 14h10v7H7z"/></svg>',
+  back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>',
+  qr: '<svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2M14 18h2v2M18 18h2v2"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg>',
+  field: '<svg viewBox="0 0 24 24"><path d="M3 18l5-10 5 6 3-4 5 8z"/><path d="M3 21h18"/></svg>',
+  bale: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 12h.01"/></svg>',
   traktor: '<svg viewBox="0 0 24 24"><circle cx="7" cy="16" r="3.5"/><circle cx="18" cy="17" r="2.5"/><path d="M4 12V7h7l2 5h6v5h-1M10.5 16h5M7 7V4"/></svg>',
   motorrad: '<svg viewBox="0 0 24 24"><circle cx="5.5" cy="16" r="3.5"/><circle cx="18.5" cy="16" r="3.5"/><path d="M5.5 16l4-6h5l4 6M9 7h3l2.5 3"/></svg>',
   auto: '<svg viewBox="0 0 24 24"><path d="M3 16v-4l2-5h14l2 5v4z"/><circle cx="7" cy="16.5" r="2"/><circle cx="17" cy="16.5" r="2"/></svg>',
@@ -71,7 +78,7 @@ const unitShort = (m) => m.unit || '';
 // ---------- Zustand ----------
 let store = null;
 let user = null;
-let DATA = { machines: [], entries: [] };
+let DATA = { machines: [], entries: [], harvest: [] };
 let tab = 'home';
 let costYear = String(new Date().getFullYear());
 let historyFilter = { machine: '', kind: '' };
@@ -232,6 +239,7 @@ function render() {
   if (tab === 'home') v.innerHTML = homeHtml();
   else if (tab === 'machines') v.innerHTML = machinesHtml();
   else if (tab === 'costs') v.innerHTML = costsHtml();
+  else if (tab === 'ernte') v.innerHTML = ernteHtml();
   else v.innerHTML = historyHtml();
   bindMain(v);
 }
@@ -284,7 +292,8 @@ function homeHtml() {
 function machinesHtml() {
   const list = sortedMachines();
   return `
-    <button class="btn primary" data-act="newMachine" style="margin-bottom:14px">${I.plus} Maschine anlegen</button>
+    <button class="btn primary" data-act="newMachine" style="margin-bottom:8px">${I.plus} Maschine anlegen</button>
+    ${list.length ? `<button class="btn" data-act="qr" style="margin-bottom:14px">${I.qr} QR-Aufkleber drucken</button>` : ''}
     ${list.length ? list.map((m) => {
       const p = pickerlStatus(m);
       const w = worstService(m);
@@ -328,6 +337,14 @@ function costsHtml() {
     ${ents.length ? `
       <div class="card"><h2>Nach Maschine</h2>${bars(byMachine, (id) => (machineById(id) || {}).name || 'Gelöschte Maschine')}</div>
       <div class="card"><h2>Nach Art</h2>${bars(byKind, (k) => KINDS[k]?.label || k)}</div>` : '<div class="empty">In diesem Jahr wurden noch keine Kosten eingetragen.</div>'}
+    ${(() => {
+      const rows = sortedMachines().map((m) => ({ m, s: fuelStats(entriesOf(m.id), costYear) })).filter((r) => r.s.liters);
+      if (!rows.length) return '';
+      const max = Math.max(...rows.map((r) => r.s.liters));
+      return `<div class="card"><h2>Tankbuch ${costYear}</h2>${rows.map((r) => `<div class="cbar"><div class="lbl"><span>${esc(r.m.name)}</span><span class="num">${fmt(r.s.liters)} l${r.s.cost ? ` · ${money(r.s.cost)}` : ''}</span></div>
+        <div class="track"><div class="fill" style="width:${(r.s.liters / max) * 100}%"></div></div></div>`).join('')}
+        <small class="muted">Gesamt ${fmt(rows.reduce((s, r) => s + r.s.liters, 0))} Liter</small></div>`;
+    })()}
     <button class="btn" data-act="csv">${I.down} ${costYear} als Tabelle exportieren (CSV)</button>
     <p class="hint">Die CSV-Datei lässt sich in Excel oder Google Tabellen öffnen – praktisch für die Buchhaltung.</p>`;
 }
@@ -352,10 +369,16 @@ function historyHtml() {
 
 function bindMain(v) {
   $$('[data-act="newMachine"]', v).forEach((b) => (b.onclick = () => openSheet(viewMachineForm(null))));
+  $$('[data-act="qr"]', v).forEach((b) => (b.onclick = () => printStickers(sortedMachines())));
   $$('[data-machine]', v).forEach((b) => (b.onclick = () => openSheet(viewMachine(b.dataset.machine))));
   $$('[data-entry]', v).forEach((b) => (b.onclick = () => { const e = DATA.entries.find((x) => x.id === b.dataset.entry); if (e) openSheet(viewEntryForm({ entry: e })); }));
   $$('[data-tabgo]', v).forEach((b) => (b.onclick = () => { tab = b.dataset.tabgo; render(); window.scrollTo(0, 0); }));
   $$('[data-year]', v).forEach((b) => (b.onclick = () => { costYear = b.dataset.year; render(); }));
+  $$('[data-eyear]', v).forEach((b) => (b.onclick = () => { ernteYear = b.dataset.eyear; render(); }));
+  $$('[data-act="newHarvest"]', v).forEach((b) => (b.onclick = () => openSheet(viewHarvestForm({}))));
+  $$('[data-field]', v).forEach((b) => (b.onclick = () => openSheet(viewField(b.dataset.field))));
+  const ec = $('[data-act="ernteCsv"]', v); if (ec) ec.onclick = () => exportErnteCsv(ernteYear);
+  const ea = $('[data-act="ernteCsvAll"]', v); if (ea) ea.onclick = () => exportErnteCsv('');
   const csv = $('[data-act="csv"]', v);
   if (csv) csv.onclick = () => exportCsv(costYear);
   const hm = $('#hMachine', v);
@@ -416,6 +439,10 @@ function viewMachine(id) {
           <div class="stat"><b class="num">${money(total)}</b><small>gesamt</small></div>
           <div class="stat"><b class="num">${perUnit != null ? money(perUnit) : '–'}</b><small>pro ${m.unit === 'km' ? '100 km' : m.unit || 'Einheit'}</small></div>
         </div>
+        ${fuelHtml(m, ents)}
+        ${partsHtml(m)}
+        <div class="section-title">Fotos (Typenschild, Rechnungen …)</div>
+        <div class="photos" id="mPhotos"></div><input type="file" id="mFile" accept="image/*" multiple hidden>
         ${m.notes || m.vin ? `<div class="section-title">Daten</div><div class="panel"><dl class="kv" style="margin:0">
           ${m.vin ? `<dt>Fahrgestellnr.</dt><dd>${esc(m.vin)}</dd>` : ''}
           ${m.notes ? `<dt>Notizen</dt><dd style="white-space:pre-wrap;text-align:left">${esc(m.notes)}</dd>` : ''}</dl></div>` : ''}
@@ -427,13 +454,188 @@ function viewMachine(id) {
         $$('[data-last]', body).forEach((b) => (b.onclick = () => pushView(viewEntryForm({ machineId: id, kind: 'service', preset: [b.dataset.last], past: true }))));
         $$('[data-entry]', body).forEach((b) => (b.onclick = () => { const e = DATA.entries.find((x) => x.id === b.dataset.entry); if (e) pushView(viewEntryForm({ entry: e })); }));
         $('#mEdit', body).onclick = () => pushView(viewMachineForm(id));
+        $('#mParts', body).onclick = () => pushView(viewParts(id));
+        const stopPh = photoStrip($('#mPhotos', body), $('#mFile', body), { machineId: id, entryId: null });
         const cal = $('#mCal', body);
         if (cal) cal.onclick = () => openCalendar(`${m.name}-termine.ics`, icsFor(m));
+        return stopPh;
       },
     };
   };
   view.machineId = id;
   return view;
+}
+
+// ---------- Teile & Betriebsstoffe ----------
+const PART_SUGGEST = {
+  traktor: ['Motoröl', 'Ölfilter', 'Luftfilter', 'Kraftstofffilter', 'Hydraulik-/Getriebeöl', 'Reifen vorne', 'Reifen hinten', 'Batterie', 'Keilriemen'],
+  motorrad: ['Motoröl', 'Ölfilter', 'Zündkerze', 'Reifen vorne', 'Reifen hinten', 'Kette / Ritzel', 'Batterie'],
+  auto: ['Motoröl', 'Ölfilter', 'Luftfilter', 'Reifen Sommer', 'Reifen Winter', 'Wischerblätter', 'Batterie'],
+  anhaenger: ['Reifen', 'Bremsbeläge', 'Radlager'],
+  geraet: ['Öl', 'Filter', 'Messer / Zinken', 'Keilriemen'],
+  sonstiges: [],
+};
+function partsHtml(m) {
+  const ps = (m.parts || []).filter((p) => p.name || p.value);
+  return `<div class="section-title">Teile & Betriebsstoffe</div>
+    ${ps.length ? `<div class="panel"><dl class="kv" style="margin:0">${ps.map((p) => `<dt>${esc(p.name)}</dt><dd>${esc(p.value)}</dd>`).join('')}</dl></div>`
+      : '<p class="hint" style="margin-top:0">Ölsorte, Filternummern, Reifengrößen … einmal eintragen – dann hast du alles beim Händler griffbereit.</p>'}
+    <button class="btn" id="mParts">${I.edit} Teile & Betriebsstoffe bearbeiten</button>`;
+}
+function viewParts(id) {
+  return () => {
+    const m = machineById(id);
+    if (!m) return null;
+    const rows = (m.parts && m.parts.length ? m.parts : []).map((p) => ({ ...p }));
+    const sugg = () => (PART_SUGGEST[m.type] || []).filter((s) => !rows.some((r) => r.name === s));
+    return {
+      title: `Teile – ${m.name}`,
+      tall: true,
+      html: `<div id="pRows"></div><div class="chips" id="pSugg"></div>
+        <button class="btn" id="pAdd">${I.plus} Zeile hinzufügen</button>
+        <button class="btn primary" id="pSave">Speichern</button>`,
+      mount(body) {
+        const draw = () => {
+          $('#pRows', body).innerHTML = rows.map((r, i) => `<div class="part-row">
+            <input class="input" data-pn="${i}" value="${esc(r.name || '')}" placeholder="z. B. Motoröl">
+            <input class="input" data-pv="${i}" value="${esc(r.value || '')}" placeholder="z. B. 15W-40, 12 l">
+            <button class="icon-btn" data-px="${i}" aria-label="Zeile löschen">${I.trash}</button></div>`).join('') || '<p class="hint">Noch nichts eingetragen – tipp unten auf einen Vorschlag.</p>';
+          $('#pSugg', body).innerHTML = sugg().map((s) => `<button class="chip" data-ps="${esc(s)}">+ ${esc(s)}</button>`).join('');
+          $$('[data-pn]', body).forEach((el) => (el.oninput = () => { rows[+el.dataset.pn].name = el.value; }));
+          $$('[data-pv]', body).forEach((el) => (el.oninput = () => { rows[+el.dataset.pv].value = el.value; }));
+          $$('[data-px]', body).forEach((b) => (b.onclick = () => { rows.splice(+b.dataset.px, 1); draw(); }));
+          $$('[data-ps]', body).forEach((b) => (b.onclick = () => { rows.push({ name: b.dataset.ps, value: '' }); draw(); const ins = $$('[data-pv]', body); ins[ins.length - 1].focus(); }));
+        };
+        draw();
+        $('#pAdd', body).onclick = () => { rows.push({ name: '', value: '' }); draw(); };
+        $('#pSave', body).onclick = () => {
+          store.saveMachine(id, { parts: rows.map((r) => ({ name: (r.name || '').trim(), value: (r.value || '').trim() })).filter((r) => r.name || r.value) });
+          toast('Gespeichert'); backView();
+        };
+      },
+    };
+  };
+}
+
+// ---------- Tankbuch ----------
+function fuelStats(list, year) {
+  const f = list.filter((e) => e.kind === 'fuel' && e.liters && (!year || (e.date || '').startsWith(year)));
+  const liters = f.reduce((s, e) => s + e.liters, 0);
+  const cost = f.reduce((s, e) => s + (e.cost || 0), 0);
+  const all = list.filter((e) => e.kind === 'fuel' && e.liters && e.reading != null).sort((a, b) => a.reading - b.reading);
+  let perUnit = null;
+  if (all.length >= 2 && all[all.length - 1].reading > all[0].reading) perUnit = all.slice(1).reduce((s, e) => s + e.liters, 0) / (all[all.length - 1].reading - all[0].reading);
+  return { liters, cost, perLiter: liters && cost ? cost / liters : null, perUnit, count: f.length };
+}
+function fuelHtml(m, ents) {
+  if (!ents.some((e) => e.kind === 'fuel' && e.liters)) return '';
+  const y = String(new Date().getFullYear());
+  const s = fuelStats(ents, y); const all = fuelStats(ents);
+  const per = all.perUnit != null ? (m.unit === 'km' ? `${fmt(all.perUnit * 100, 1)} l/100 km` : `${fmt(all.perUnit, 1)} l/${m.unit || 'Einheit'}`) : '–';
+  return `<div class="section-title">Tankbuch</div>
+    <div class="stats">
+      <div class="stat"><b class="num">${fmt(s.liters)} l</b><small>${y}</small></div>
+      <div class="stat"><b class="num">${per}</b><small>Ø Verbrauch</small></div>
+      <div class="stat"><b class="num">${s.perLiter ? money(s.perLiter) : '–'}</b><small>pro Liter</small></div>
+    </div>
+    ${all.perUnit == null ? '<p class="hint" style="margin-top:-6px">Für den Verbrauch beim Tanken auch den Stand eintragen (mindestens zweimal).</p>' : ''}`;
+}
+
+// ---------- Fotos (Rechnungen, Typenschild, Schäden) ----------
+async function fileToJpeg(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    let max = 1400;
+    for (let tries = 0; tries < 4; tries++) {
+      const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.naturalWidth * sc); cv.height = Math.round(img.naturalHeight * sc);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      for (let q = 0.78; q >= 0.45; q -= 0.1) { const d = cv.toDataURL('image/jpeg', q); if (d.length < 650000) return d; }
+      max = Math.round(max * 0.75);
+    }
+    throw new Error('Foto zu groß');
+  } finally { URL.revokeObjectURL(url); }
+}
+// Fotostreifen: lädt/zeigt/fügt Fotos hinzu. ref = { machineId, entryId }
+function photoStrip(box, fileInput, ref, onAdded) {
+  let photos = [];
+  let alive = true;
+  const draw = () => {
+    if (!alive) return;
+    box.innerHTML = photos.map((p, i) => `<div class="ph"><img src="${p.data}" alt="" data-pv="${i}"><button class="del" data-pd="${i}" aria-label="Foto löschen">${I.trash}</button></div>`).join('')
+      + `<button class="ph add" data-padd aria-label="Foto hinzufügen">${I.camera}</button>`;
+    $$('[data-pv]', box).forEach((im) => (im.onclick = () => { $('#viewerImg').src = photos[+im.dataset.pv].data; $('#viewer').hidden = false; }));
+    $$('[data-pd]', box).forEach((b) => (b.onclick = async () => {
+      if (!confirm('Foto löschen?')) return;
+      const p = photos[+b.dataset.pd];
+      try { await store.deletePhoto(p.id); photos = photos.filter((x) => x !== p); draw(); } catch (e) { onStoreError(e); }
+    }));
+    $('[data-padd]', box).onclick = () => fileInput.click();
+  };
+  store.listPhotos(ref.machineId).then((ps) => { photos = ps.filter((p) => (p.entryId || null) === (ref.entryId || null)); draw(); }).catch(() => draw());
+  fileInput.onchange = async (ev) => {
+    const files = [...ev.target.files]; ev.target.value = '';
+    for (const file of files) {
+      try {
+        toast('Foto wird gespeichert …');
+        const data = await fileToJpeg(file);
+        const p = { machineId: ref.machineId, entryId: ref.entryId || null, data, createdAt: Date.now(), by: userName() };
+        p.id = await store.addPhoto(p);
+        photos.push(p); draw();
+        if (onAdded) onAdded(p);
+      } catch (e) { toast(e && e.code === 'quota' ? 'Speicher voll – im Demo-Modus passen nur wenige Fotos.' : 'Foto konnte nicht gespeichert werden.'); }
+    }
+  };
+  draw();
+  return () => { alive = false; };
+}
+
+// ---------- QR-Aufkleber ----------
+const machineUrl = (id) => new URL(`./?m=${encodeURIComponent(id)}`, location.href).href;
+function qrSvg(text) { const q = window.qrcode(0, 'M'); q.addData(text); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0 }); }
+function printStickers(list) {
+  if (!window.qrcode) { toast('QR-Bibliothek fehlt'); return; }
+  if (!list.length) { toast('Noch keine Maschinen'); return; }
+  const area = $('#printArea');
+  area.innerHTML = `<div class="print-bar no-print"><button class="btn" id="qClose">${I.back} Zurück</button><button class="btn primary" id="qGo">${I.print} Drucken</button></div>
+    <p class="hint no-print">Ausdrucken, ausschneiden und z. B. mit Klebefolie geschützt in die Kabine kleben. Scannen öffnet die Maschine direkt in der App – praktisch zum Stunden eintragen.</p>
+    <div class="qr-grid">${list.map((m) => `<div class="qr-card"><b>${esc(m.name)}</b>${qrSvg(machineUrl(m.id))}<small>Hof-Maschinen · scannen zum Eintragen</small></div>`).join('')}</div>`;
+  document.body.classList.add('printing'); window.scrollTo(0, 0);
+  $('#qClose', area).onclick = () => { document.body.classList.remove('printing'); area.innerHTML = ''; };
+  $('#qGo', area).onclick = () => { try { window.print(); } catch (e) { toast('Drucken geht hier nicht'); } };
+}
+
+// ---------- Erinnerungen (Benachrichtigung am Handy) ----------
+const REMIND_KEY = 'hofmaschinen_remind';
+const remindOn = () => { try { return localStorage.getItem(REMIND_KEY) === '1'; } catch (e) { return false; } };
+async function updateReminders() {
+  const items = dueItems().map((d) => ({ name: d.m.name, label: d.label, text: d.text, status: d.status }));
+  // Für den Hintergrund-Check im Service Worker merken
+  try { const c = await caches.open('hof-maschinen-due'); await c.put('due.json', new Response(JSON.stringify({ at: Date.now(), items, on: remindOn() }))); } catch (e) { /* */ }
+  if (!remindOn() || !('Notification' in window) || Notification.permission !== 'granted') return;
+  const today = isoDay();
+  let last = null; try { last = localStorage.getItem('hofmaschinen_lastnotify'); } catch (e) { /* */ }
+  if (last === today || !items.length) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const title = `Hof-Maschinen: ${items.length} ${items.length === 1 ? 'Sache' : 'Sachen'} fällig`;
+    const body = items.slice(0, 4).map((i) => `${i.name}: ${i.label}`).join('\n');
+    if (reg) await reg.showNotification(title, { body, icon: 'icons/icon-192.png', tag: 'due' }); else new Notification(title, { body });
+    localStorage.setItem('hofmaschinen_lastnotify', today);
+  } catch (e) { /* */ }
+}
+async function enableReminders(on) {
+  if (on) {
+    if (!('Notification' in window)) { toast('Dieses Handy/dieser Browser kann keine Benachrichtigungen'); return false; }
+    const p = await Notification.requestPermission();
+    if (p !== 'granted') { toast('Benachrichtigungen wurden nicht erlaubt'); return false; }
+    try { const reg = await navigator.serviceWorker.ready; if (reg.periodicSync) await reg.periodicSync.register('due-check', { minInterval: 12 * 3600 * 1000 }); } catch (e) { /* nicht überall möglich */ }
+  }
+  try { localStorage.setItem(REMIND_KEY, on ? '1' : '0'); localStorage.removeItem('hofmaschinen_lastnotify'); } catch (e) { /* */ }
+  updateReminders();
+  return true;
 }
 
 // ---------- Ansicht: Maschine anlegen / bearbeiten ----------
@@ -602,12 +804,24 @@ function viewEntryForm({ machineId, kind, entry, preset, past }) {
           <label class="field" id="eLitersWrap"><span>Liter</span><input class="input num" id="eLiters" inputmode="decimal" value="${fmtIn(e.liters)}"></label>
         </div>
         <label class="field"><span>Notiz (Teile, Werkstatt, Ölsorte …)</span><textarea class="input" id="eNote" rows="2">${esc(e.note || '')}</textarea></label>
+        <div class="section-title" id="ePhTitle">Fotos (Rechnung, Schaden …)</div>
+        <div class="photos" id="ePhotos"></div><input type="file" id="eFile" accept="image/*" multiple hidden>
         <button class="btn primary" id="eSave">Speichern</button>
         ${entry ? `<button class="btn danger" id="eDel">${I.trash} Eintrag löschen</button>
           <p class="hint">Eingetragen ${e.by ? 'von ' + esc(e.by) + ' ' : ''}am ${fmtDate(e.date)}. Änderungen hier passen den Maschinenstand nicht rückwirkend an.</p>` : ''}`,
       mount(body) {
         const machineSel = $('#eMachine', body);
         const readingIn = $('#eReading', body);
+        // Fotos: neue Einträge bekommen ihre ID schon jetzt, damit Fotos dazu passen
+        const eid = entry ? entry.id : store.newId('entry');
+        let saved = !!entry;
+        const added = [];
+        let stopPh = null;
+        const phSetup = () => {
+          if (stopPh) stopPh();
+          $('#ePhTitle', body).hidden = $('#ePhotos', body).hidden = !mid;
+          stopPh = mid ? photoStrip($('#ePhotos', body), $('#eFile', body), { machineId: mid, entryId: eid }, (p) => added.push(p)) : null;
+        };
         let readingTouched = !!entry;
         if (entry) readingIn.value = fmtIn(e.reading);
         readingIn.oninput = () => { readingTouched = true; };
@@ -637,7 +851,7 @@ function viewEntryForm({ machineId, kind, entry, preset, past }) {
             $('#ePickNext', body).value = idxToYm(monthIdx(base) + (+p.interval || 12));
           }
         };
-        machineSel.onchange = () => { mid = machineSel.value; readingTouched = false; sel.clear(); sync(); };
+        machineSel.onchange = () => { mid = machineSel.value; readingTouched = false; sel.clear(); sync(); phSetup(); };
         $$('#eKind button', body).forEach((b) => (b.onclick = () => { k = b.dataset.kind; sync(); }));
         sync();
 
@@ -668,11 +882,20 @@ function viewEntryForm({ machineId, kind, entry, preset, past }) {
               ? { ...iv, lastDate: date, lastReading: reading != null ? reading : (m.reading ?? null) } : iv));
           }
           if (k === 'pickerl' && data.pickerlNext) patch.pickerl = { ...(m.pickerl || {}), required: true, due: data.pickerlNext };
-          store.saveEntry(entry ? entry.id : null, data, m.id, Object.keys(patch).length ? patch : null);
+          store.saveEntry(eid, data, m.id, Object.keys(patch).length ? patch : null);
+          saved = true;
           toast('Gespeichert');
           backView();
         };
-        if (entry) $('#eDel', body).onclick = () => { if (confirm('Eintrag löschen?')) { store.deleteEntry(entry.id); toast('Gelöscht'); backView(); } };
+        phSetup();
+        if (entry) $('#eDel', body).onclick = () => {
+          if (!confirm('Eintrag löschen?')) return;
+          store.deleteEntry(entry.id);
+          store.listPhotos(entry.machineId).then((ps) => ps.filter((p) => p.entryId === entry.id).forEach((p) => store.deletePhoto(p.id).catch(() => {}))).catch(() => {});
+          toast('Gelöscht'); backView();
+        };
+        // nicht gespeicherter neuer Eintrag -> dazu aufgenommene Fotos wieder entfernen
+        return () => { if (stopPh) stopPh(); if (!saved) added.forEach((p) => store.deletePhoto(p.id).catch(() => {})); };
       },
     };
   };
@@ -689,6 +912,13 @@ function viewSettings() {
         <label class="field"><span>Dein Name (steht bei deinen Einträgen)</span><input class="input" id="sName" value="${esc(userName())}" autocomplete="name"></label>
         <button class="btn" id="sNameSave">Name speichern</button>
       </div>
+      <div class="section-title">Erinnerungen</div>
+      <div class="panel">
+        <label class="toggle"><span>Benachrichtigung am Handy, wenn Service oder Pickerl fällig sind</span><input type="checkbox" id="sRemind" ${remindOn() && 'Notification' in window && Notification.permission === 'granted' ? 'checked' : ''}></label>
+        <p class="hint" style="margin-bottom:0">Kommt einmal am Tag, wenn du die App öffnest. Am Android (App installiert) prüft das Handy zusätzlich ab und zu im Hintergrund. Ganz sicher geht's mit „Termine in den Kalender übernehmen“ bei jeder Maschine.</p>
+      </div>
+      <div class="section-title">QR-Aufkleber</div>
+      <div class="panel"><button class="btn" id="sQr">${I.qr} QR-Aufkleber für alle Maschinen drucken</button></div>
       <div class="section-title">Konto</div>
       <div class="panel">
         ${store.mode === 'demo'
@@ -708,8 +938,10 @@ function viewSettings() {
       const lo = $('#sLogout', body);
       if (lo) lo.onclick = async () => { await store.signOut(); closeSheet(); };
       $('#sCsv', body).onclick = () => exportCsv(null);
+      $('#sRemind', body).onchange = async (ev) => { const ok = await enableReminders(ev.target.checked); if (!ok) ev.target.checked = false; else toast(ev.target.checked ? 'Erinnerungen an' : 'Erinnerungen aus'); };
+      $('#sQr', body).onclick = () => { closeSheet(); printStickers(sortedMachines()); };
       $('#sJson', body).onclick = () => saveFile(`hof-maschinen-backup-${isoDay()}.json`, 'application/json',
-        JSON.stringify({ app: 'hof-maschinen', version: VERSION, exported: new Date().toISOString(), machines: DATA.machines, entries: DATA.entries }, null, 1));
+        JSON.stringify({ app: 'hof-maschinen', version: VERSION, exported: new Date().toISOString(), machines: DATA.machines, entries: [...DATA.entries, ...DATA.harvest] }, null, 1));
       $('#sImport', body).onclick = () => $('#sImportFile', body).click();
       $('#sImportFile', body).onchange = async (ev) => {
         const f = ev.target.files[0];
@@ -739,6 +971,247 @@ function exportCsv(year) {
   });
   const text = '﻿' + rows.map((r) => r.map(csvCell).join(';')).join('\r\n');
   saveFile(`hof-maschinen-${year || 'alle'}.csv`, 'text/csv', text);
+}
+
+// ---------- Ernte: Ballen pro Feld und Schnitt ----------
+const BALE_TYPES = { silage: 'Silage', heu: 'Heu', grummet: 'Grummet', stroh: 'Stroh' };
+const FIELD_CATS = ['wiese', 'weide', 'flaeche'];
+const MAX_CUT = 5;
+let ernteYear = String(new Date().getFullYear());
+let mapFields = [];   // Flächen aus der Hof-Karte
+const normName = (s) => String(s || '').trim().toLowerCase();
+function areaM2(cs) {
+  if (!Array.isArray(cs) || cs.length < 3) return 0;
+  const R = 6371008.8; const rad = (d) => (d * Math.PI) / 180;
+  const lat0 = cs.reduce((s, c) => s + c.lat, 0) / cs.length;
+  const k = Math.cos(rad(lat0));
+  const pts = cs.map((c) => [rad(c.lng) * R * k, rad(c.lat) * R]);
+  let s = 0;
+  pts.forEach((p, i) => { const q = pts[(i + 1) % pts.length]; s += p[0] * q[1] - q[0] * p[1]; });
+  return Math.abs(s) / 2;
+}
+function setMapFields(features) {
+  mapFields = (features || [])
+    .filter((f) => f.kind === 'area' && FIELD_CATS.includes(f.cat) && Array.isArray(f.coords) && f.coords.length > 2)
+    .map((f) => ({ key: f.id, id: f.id, name: (f.title || 'Feld').trim(), ha: Math.round(areaM2(f.coords) / 100) / 100, fromMap: true }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+const fieldKeyOf = (e) => (e.fieldId && mapFields.some((f) => f.id === e.fieldId) ? e.fieldId : `n:${normName(e.field)}`);
+function allFields() {
+  const list = mapFields.map((f) => ({ ...f }));
+  const seen = new Set(list.map((f) => f.key));
+  [...DATA.harvest].sort((a, b) => (b.date || '').localeCompare(a.date || '')).forEach((e) => {
+    const key = fieldKeyOf(e);
+    if (seen.has(key)) return;
+    seen.add(key);
+    list.push({ key, id: null, name: e.field || 'Ohne Namen', ha: e.ha || null, fromMap: false });
+  });
+  return list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
+}
+const fieldByKey = (key) => allFields().find((f) => f.key === key);
+const harvestYear = (e) => String(e.year || (e.date || '').slice(0, 4));
+const harvestOf = (year, key) => DATA.harvest.filter((e) => harvestYear(e) === year && (!key || fieldKeyOf(e) === key));
+const sumBales = (list) => list.reduce((s, e) => s + (e.bales || 0), 0);
+function byCut(list) { const o = {}; list.forEach((e) => { o[e.cut || 1] = (o[e.cut || 1] || 0) + (e.bales || 0); }); return o; }
+const prevYear = (y) => String(+y - 1);
+function diffBadge(now, before) {
+  if (!before) return '';
+  const d = Math.round(((now - before) / before) * 100);
+  const cls = d > 0 ? 'ok' : d < 0 ? 'bad' : '';
+  return `<span class="badge ${cls}">${d > 0 ? '▲ +' : d < 0 ? '▼ ' : '± '}${d} % zum Vorjahr</span>`;
+}
+const perHa = (bales, ha) => (ha && bales ? `${fmt(bales / ha, 1)} Ballen/ha` : '');
+const cutLine = (cuts) => Object.keys(cuts).sort((a, b) => a - b).map((c) => `${c}. Schnitt: ${fmt(cuts[c])}`).join(' · ');
+
+function ernteHtml() {
+  const years = new Set([String(new Date().getFullYear())]);
+  DATA.harvest.forEach((e) => years.add(harvestYear(e)));
+  const yrs = [...years].filter(Boolean).sort().reverse();
+  if (!yrs.includes(ernteYear)) ernteYear = yrs[0];
+  const list = harvestOf(ernteYear);
+  const prev = harvestOf(prevYear(ernteYear));
+  const total = sumBales(list);
+  const prevTotal = sumBales(prev);
+  const cuts = byCut(list);
+  const types = {};
+  list.forEach((e) => { const t = BALE_TYPES[e.baleType] || 'Sonstige'; types[t] = (types[t] || 0) + (e.bales || 0); });
+  const fields = allFields();
+  const rows = fields.map((f) => {
+    const fl = list.filter((e) => fieldKeyOf(e) === f.key);
+    const pl = prev.filter((e) => fieldKeyOf(e) === f.key);
+    return { f, sum: sumBales(fl), prevSum: sumBales(pl), cuts: byCut(fl) };
+  }).sort((a, b) => b.sum - a.sum || a.f.name.localeCompare(b.f.name, 'de'));
+  const haTotal = rows.filter((r) => r.sum && r.f.ha).reduce((s, r) => s + r.f.ha, 0);
+  const balesWithHa = rows.filter((r) => r.sum && r.f.ha).reduce((s, r) => s + r.sum, 0);
+  return `
+    <div class="seg">${yrs.map((y) => `<button data-eyear="${y}" class="${y === ernteYear ? 'on' : ''}">${y}</button>`).join('')}</div>
+    <div class="card">
+      <small class="muted">Ballen ${ernteYear}</small>
+      <div class="total num">${fmt(total)}</div>
+      <div class="badges">${diffBadge(total, prevTotal)}${prevTotal ? `<span class="badge">Vorjahr: ${fmt(prevTotal)}</span>` : ''}${haTotal ? `<span class="badge">${fmt(balesWithHa / haTotal, 1)} Ballen/ha</span>` : ''}</div>
+      ${total ? `<div class="ernte-cuts">${Object.keys(cuts).sort((a, b) => a - b).map((c) => `<div><b class="num">${fmt(cuts[c])}</b><small>${c}. Schnitt</small></div>`).join('')}</div>
+        <small class="muted">${Object.entries(types).map(([t, n]) => `${esc(t)} ${fmt(n)}`).join(' · ')}</small>` : ''}
+    </div>
+    <button class="btn primary" data-act="newHarvest">${I.plus} Ballen eintragen</button>
+    <div class="section-title">Nach Feld</div>
+    ${rows.length ? `<div class="list">${rows.map(({ f, sum, prevSum, cuts: c }) => `
+      <button class="list-item" data-field="${esc(f.key)}">
+        <span class="ico ${sum ? '' : 'muted-ico'}">${I.field}</span>
+        <span class="info"><span class="name">${esc(f.name)}</span>
+          <small>${esc([f.ha ? `${fmt(f.ha, 2)} ha` : '', sum ? cutLine(c) : 'noch nichts eingetragen'].filter(Boolean).join(' · '))}</small></span>
+        <span class="val num">${sum ? fmt(sum) : '–'}<small>${esc(prevSum ? `Vorjahr ${fmt(prevSum)}` : perHa(sum, f.ha))}</small></span>
+      </button>`).join('')}</div>`
+      : `<div class="empty">Noch keine Felder. Zeichne in der <b>Hof-Karte</b> deine Wiesen als „Wiese / Feld“ ein – dann stehen sie hier mit Fläche zur Auswahl. Oder tipp auf „Ballen eintragen“ und gib einen Feldnamen ein.</div>`}
+    ${mapFields.length ? '' : '<p class="hint">Tipp: In der Hof-Karte eingezeichnete Wiesen erscheinen hier automatisch, inklusive Hektar.</p>'}
+    <button class="btn" data-act="ernteCsv">${I.down} Ernte ${ernteYear} als Tabelle (Excel)</button>
+    <button class="btn" data-act="ernteCsvAll">${I.down} Alle Jahre als Tabelle (Excel)</button>`;
+}
+
+function viewField(key) {
+  const view = () => {
+    const f = fieldByKey(key);
+    if (!f) return { title: 'Feld', live: true, html: '<div class="empty">Dieses Feld hat keine Einträge mehr.</div>' };
+    const ents = DATA.harvest.filter((e) => fieldKeyOf(e) === key);
+    const years = [...new Set(ents.map(harvestYear))].sort().reverse();
+    const maxCut = Math.max(1, ...ents.map((e) => e.cut || 1));
+    const cutsArr = Array.from({ length: maxCut }, (_, i) => i + 1);
+    return {
+      title: f.name,
+      live: true,
+      html: `
+        <div class="muted" style="margin:-4px 0 12px">${esc([f.ha ? `${fmt(f.ha, 2)} ha` : 'Fläche unbekannt', f.fromMap ? 'aus der Hof-Karte' : ''].filter(Boolean).join(' · '))}</div>
+        <button class="btn primary" id="fNew">${I.plus} Ballen für dieses Feld eintragen</button>
+        ${years.length ? `<div class="section-title">Jahre im Vergleich</div>
+        <div class="table-wrap"><table class="etable"><thead><tr><th>Jahr</th>${cutsArr.map((c) => `<th>${c}.</th>`).join('')}<th>Summe</th>${f.ha ? '<th>/ha</th>' : ''}</tr></thead><tbody>
+          ${years.map((y) => { const yl = ents.filter((e) => harvestYear(e) === y); const c = byCut(yl); const s = sumBales(yl);
+            return `<tr><td>${y}</td>${cutsArr.map((n) => `<td>${c[n] ? fmt(c[n]) : '–'}</td>`).join('')}<td><b>${fmt(s)}</b></td>${f.ha ? `<td>${fmt(s / f.ha, 1)}</td>` : ''}</tr>`; }).join('')}
+        </tbody></table></div>
+        <div class="section-title">Einträge</div>
+        <div class="list">${[...ents].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(harvestRow).join('')}</div>`
+        : '<div class="empty">Für dieses Feld ist noch nichts eingetragen.</div>'}`,
+      mount(body) {
+        $('#fNew', body).onclick = () => pushView(viewHarvestForm({ fieldKey: key }));
+        $$('[data-harvest]', body).forEach((b) => (b.onclick = () => { const e = DATA.harvest.find((x) => x.id === b.dataset.harvest); if (e) pushView(viewHarvestForm({ entry: e })); }));
+      },
+    };
+  };
+  return view;
+}
+function harvestRow(e) {
+  return `<button class="list-item" data-harvest="${esc(e.id)}">
+    <span class="ico">${I.bale}</span>
+    <span class="info"><span class="name">${esc(`${e.cut || 1}. Schnitt · ${BALE_TYPES[e.baleType] || ''}`)}</span>
+      <small>${esc([fmtDate(e.date), e.field, e.note, e.by].filter(Boolean).join(' · '))}</small></span>
+    <span class="val num">${fmt(e.bales)}<small>Ballen</small></span></button>`;
+}
+
+function viewHarvestForm({ entry, fieldKey }) {
+  return () => {
+    const e = entry || {};
+    const fields = allFields();
+    let key = entry ? fieldKeyOf(e) : (fieldKey || '');
+    let cut = e.cut || 1;
+    let type = e.baleType || '';
+    let cutTouched = !!entry;
+    let typeTouched = !!entry;
+    return {
+      title: entry ? 'Ernte bearbeiten' : 'Ballen eintragen',
+      tall: true,
+      html: `
+        <label class="field"><span>Feld</span><select class="input" id="hField">
+          <option value="">Bitte wählen …</option>
+          ${fields.map((f) => `<option value="${esc(f.key)}" ${f.key === key ? 'selected' : ''}>${esc(f.name)}${f.ha ? ` (${fmt(f.ha, 2)} ha)` : ''}</option>`).join('')}
+          <option value="__new">+ Anderes Feld …</option></select></label>
+        <div class="grid2" id="hNewWrap" hidden>
+          <label class="field"><span>Name des Feldes</span><input class="input" id="hNewName" autocomplete="off" placeholder="z. B. Hausleiten"></label>
+          <label class="field"><span>Fläche (ha, optional)</span><input class="input num" id="hNewHa" inputmode="decimal" placeholder="z. B. 1,8"></label>
+        </div>
+        <label class="field"><span>Schnitt</span></label>
+        <div class="seg" id="hCut">${Array.from({ length: MAX_CUT }, (_, i) => i + 1).map((c) => `<button type="button" data-cut="${c}">${c}.</button>`).join('')}</div>
+        <div class="grid2">
+          <label class="field"><span>Anzahl Ballen</span><input class="input num big-num" id="hBales" inputmode="numeric" value="${e.bales != null ? esc(e.bales) : ''}" placeholder="0"></label>
+          <label class="field"><span>Datum</span><input class="input" id="hDate" type="date" value="${esc(e.date || isoDay())}"></label>
+        </div>
+        <label class="field"><span>Art</span></label>
+        <div class="seg" id="hType">${Object.entries(BALE_TYPES).map(([k, v]) => `<button type="button" data-type="${k}">${v}</button>`).join('')}</div>
+        <label class="field"><span>Notiz (optional)</span><input class="input" id="hNote" value="${esc(e.note || '')}" placeholder="z. B. sehr nass, Lohnpresser"></label>
+        <button class="btn primary" id="hSave">Speichern</button>
+        ${entry ? `<button class="btn danger" id="hDel">${I.trash} Eintrag löschen</button>
+          <p class="hint">Eingetragen ${e.by ? 'von ' + esc(e.by) + ' ' : ''}am ${fmtDate(e.date)}.</p>` : ''}`,
+      mount(body) {
+        const fieldSel = $('#hField', body);
+        const yearOf = () => ($('#hDate', body).value || isoDay()).slice(0, 4);
+        const suggest = () => {
+          if (!cutTouched && key && key !== '__new') {
+            const done = harvestOf(yearOf(), key).map((x) => x.cut || 1);
+            cut = Math.min(MAX_CUT, (done.length ? Math.max(...done) : 0) + 1);
+          }
+          if (!typeTouched) {
+            const last = [...DATA.harvest].filter((x) => (x.cut || 1) === cut && x.baleType).sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+            type = last ? last.baleType : cut === 1 ? 'silage' : cut === 2 ? 'grummet' : 'silage';
+          }
+        };
+        const sync = () => {
+          $('#hNewWrap', body).hidden = key !== '__new';
+          $$('#hCut button', body).forEach((b) => b.classList.toggle('on', +b.dataset.cut === cut));
+          $$('#hType button', body).forEach((b) => b.classList.toggle('on', b.dataset.type === type));
+        };
+        fieldSel.onchange = () => { key = fieldSel.value; suggest(); sync(); if (key === '__new') $('#hNewName', body).focus(); };
+        $('#hDate', body).onchange = () => { suggest(); sync(); };
+        $$('#hCut button', body).forEach((b) => (b.onclick = () => { cut = +b.dataset.cut; cutTouched = true; suggest(); sync(); }));
+        $$('#hType button', body).forEach((b) => (b.onclick = () => { type = b.dataset.type; typeTouched = true; sync(); }));
+        suggest(); sync();
+        $('#hSave', body).onclick = () => {
+          let name; let fieldId = null; let ha = null;
+          if (key === '__new') {
+            name = $('#hNewName', body).value.trim();
+            if (!name) { toast('Bitte einen Feldnamen eingeben'); $('#hNewName', body).focus(); return; }
+            ha = num($('#hNewHa', body).value);
+            const same = allFields().find((f) => normName(f.name) === normName(name));
+            if (same) { fieldId = same.id; ha = ha || same.ha; name = same.name; }
+          } else {
+            const f = fieldByKey(key);
+            if (!f) { toast('Bitte ein Feld wählen'); return; }
+            name = f.name; fieldId = f.id; ha = f.ha;
+          }
+          const bales = num($('#hBales', body).value);
+          if (bales == null || bales < 0) { toast('Bitte die Anzahl Ballen eingeben'); $('#hBales', body).focus(); return; }
+          const date = $('#hDate', body).value || isoDay();
+          const data = {
+            kind: 'harvest', field: name, fieldId, ha: ha || null, date, year: +date.slice(0, 4), cut, bales: Math.round(bales), baleType: type,
+            note: $('#hNote', body).value.trim(), updatedAt: Date.now(),
+          };
+          if (!entry) { data.by = userName(); data.createdAt = Date.now(); }
+          store.saveEntry(entry ? entry.id : null, data);
+          ernteYear = date.slice(0, 4);
+          toast(`${fmt(data.bales)} Ballen gespeichert`);
+          backView();
+        };
+        const del = $('#hDel', body);
+        if (del) del.onclick = () => { if (confirm('Diesen Eintrag löschen?')) { store.deleteEntry(entry.id); toast('Gelöscht'); backView(); } };
+      },
+    };
+  };
+}
+
+function exportErnteCsv(year) {
+  const csvCell = (v) => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const dec = (n, d = 2) => (n == null || n === '' ? '' : String(Math.round(n * 10 ** d) / 10 ** d).replace('.', ','));
+  const ents = DATA.harvest.filter((e) => !year || harvestYear(e) === year)
+    .sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.field || '').localeCompare(b.field || '', 'de'));
+  const rows = [['Jahr', 'Datum', 'Feld', 'Fläche (ha)', 'Schnitt', 'Art', 'Ballen', 'Notiz', 'Eingetragen von']];
+  ents.forEach((e) => { const f = fieldByKey(fieldKeyOf(e)) || {}; rows.push([harvestYear(e), fmtDate(e.date), f.name || e.field, dec(f.ha || e.ha), e.cut || 1, BALE_TYPES[e.baleType] || '', e.bales || 0, e.note || '', e.by || '']); });
+  // Übersicht pro Feld und Jahr
+  rows.push([], ['Übersicht'], ['Jahr', 'Feld', 'Fläche (ha)', ...Array.from({ length: MAX_CUT }, (_, i) => `${i + 1}. Schnitt`), 'Summe', 'Ballen/ha']);
+  const years = [...new Set(ents.map(harvestYear))].sort();
+  years.forEach((y) => allFields().forEach((f) => {
+    const fl = ents.filter((e) => harvestYear(e) === y && fieldKeyOf(e) === f.key);
+    if (!fl.length) return;
+    const c = byCut(fl); const s = sumBales(fl);
+    rows.push([y, f.name, dec(f.ha), ...Array.from({ length: MAX_CUT }, (_, i) => c[i + 1] || ''), s, f.ha ? dec(s / f.ha, 1) : '']);
+  }));
+  const text = '﻿' + rows.map((r) => r.map(csvCell).join(';')).join('\r\n');
+  saveFile(`ernte-${year || 'alle-jahre'}.csv`, 'text/csv', text);
 }
 
 // ---------- Login ----------
@@ -771,6 +1244,9 @@ function showLogin() {
 
 // ---------- Start ----------
 let unsubscribe = null;
+let deepMachine = new URLSearchParams(location.search).get('m');
+let remindTimer = null;
+let unsubFeatures = null;
 function startApp() {
   $('#boot').hidden = true;
   $('#login').hidden = true;
@@ -779,21 +1255,31 @@ function startApp() {
   $('#demoBanner').hidden = store.mode !== 'demo';
   if (unsubscribe) unsubscribe();
   unsubscribe = store.subscribe((snap) => {
-    DATA = { machines: snap.machines, entries: snap.entries };
+    DATA = { machines: snap.machines, entries: snap.entries.filter((e) => e.kind !== 'harvest'), harvest: snap.entries.filter((e) => e.kind === 'harvest') };
     $('#syncState').textContent = store.mode === 'demo' ? 'Demo-Modus'
       : snap.offline || !navigator.onLine ? 'Offline – wird später synchronisiert'
         : snap.pending ? 'Wird synchronisiert …' : 'Synchronisiert';
     render();
     if (current && current.live) showView(current, true);
+    if (deepMachine && machineById(deepMachine)) { const id = deepMachine; deepMachine = null; history.replaceState(null, '', location.pathname); openSheet(viewMachine(id)); }
+    clearTimeout(remindTimer); remindTimer = setTimeout(updateReminders, 1500);
   });
+  if (unsubFeatures) unsubFeatures();
+  unsubFeatures = store.subscribeFeatures ? store.subscribeFeatures((fs) => {
+    setMapFields(fs);
+    if (tab === 'ernte') render();
+    if (current && current.live) showView(current, true);
+  }) : null;
 }
 
 async function boot() {
   $$('.tab').forEach((t) => (t.onclick = () => { tab = t.dataset.tab; render(); window.scrollTo(0, 0); }));
-  $('#fab').onclick = () => openSheet(viewEntryForm({}));
+  $('#fab').onclick = () => openSheet(tab === 'ernte' ? viewHarvestForm({}) : viewEntryForm({}));
   $('#openSettings').onclick = () => openSheet(viewSettings);
   $('#sheetClose').onclick = closeSheet;
   $('#sheetBack').onclick = backView;
+  $('#viewerClose').onclick = () => { $('#viewer').hidden = true; };
+  $('#viewer').onclick = (e) => { if (e.target.id === 'viewer') $('#viewer').hidden = true; };
   $('#overlay').onclick = closeSheet;
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && current) closeSheet(); });
   window.addEventListener('online', () => render());

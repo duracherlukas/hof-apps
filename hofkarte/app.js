@@ -1,7 +1,7 @@
 /* Hof-Karte: Leitungen, Schieber, Kabel, Grenzsteine und Flächen am Hof einzeichnen. */
 (() => {
 const CFG = window.HOFKARTE_CONFIG || {};
-const VERSION = '1.0';
+const VERSION = '1.1';
 
 // ---------- Helfer ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -241,14 +241,17 @@ function renderFeatures() {
     } else if (f.kind === 'line') {
       const group = [];
       if (sel) group.push(L.polyline(ll, { color: '#fff', weight: 11, opacity: 0.9, interactive: false }));
-      group.push(L.polyline(ll, { color: c.color, weight: sel ? 7 : 5, dashArray: c.dash || null, lineCap: 'round', opacity: 0.95 }));
+      const lc = mapMode === 'zaun' && f.cat === 'zaun' ? fenceColor(f) : c.color;
+      group.push(L.polyline(ll, { color: lc, weight: sel ? 7 : mapMode === 'zaun' && f.cat === 'zaun' ? 7 : 5, dashArray: mapMode === 'zaun' && f.cat === 'zaun' ? null : c.dash || null, lineCap: 'round', opacity: 0.95 }));
       layer = L.featureGroup(group);
     } else {
-      layer = L.polygon(ll, { color: sel ? '#fff' : c.color, weight: sel ? 4 : 2.5, fillColor: c.color, fillOpacity: sel ? 0.35 : 0.22 });
+      const ac = mapMode === 'ertrag' && isField(f) ? yieldColor(f) : c.color;
+      layer = L.polygon(ll, { color: sel ? '#fff' : ac, weight: sel ? 4 : 2.5, fillColor: ac, fillOpacity: sel ? 0.35 : mapMode === 'ertrag' && isField(f) ? 0.45 : 0.22 });
     }
     layer.on('click', (e) => { L.DomEvent.stopPropagation(e); if (!draw) openFeature(f.id); });
-    if (showLabels && z >= 17 && f.title) {
-      layer.bindTooltip(esc(f.title), { permanent: true, direction: f.kind === 'point' ? 'right' : 'center', className: 'map-label', offset: f.kind === 'point' ? [14, -18] : [0, 0], interactive: false });
+    const lbl = featureLabel(f);
+    if (showLabels && z >= 17 && lbl) {
+      layer.bindTooltip(esc(lbl), { permanent: true, direction: f.kind === 'point' ? 'right' : 'center', className: 'map-label', offset: f.kind === 'point' ? [14, -18] : [0, 0], interactive: false });
     }
     layer.addTo(featLayer);
     layerById.set(f.id, layer);
@@ -534,6 +537,7 @@ function viewDetail(id) {
         </div>
         <div class="card"><dl class="kv">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl></div>
         ${f.note ? `<div class="card note">${esc(f.note)}</div>` : ''}
+        ${extraDetailHtml(f)}
         <div class="section-title">Fotos</div>
         <div class="photos" id="dPhotos"><div class="ph"><div class="spinner" style="margin:30% auto"></div></div></div>
         <input type="file" id="dFile" accept="image/*" multiple hidden>
@@ -543,6 +547,7 @@ function viewDetail(id) {
         <button class="btn danger" id="dDel">${svg('trash')}Löschen</button>`,
       mount(body) {
         let alive = true;
+        bindExtraDetail(f, body);
         $('#dShow', body).onclick = () => { zoomTo(f); selectedId = f.id; renderFeatures(); };
         $('#dEdit', body).onclick = () => pushView(viewForm(f));
         $('#dRedraw', body).onclick = () => startDraw({ kind: f.kind, cat: f.cat, editId: f.id });
@@ -614,9 +619,216 @@ async function fileToJpeg(file) {
   } finally { URL.revokeObjectURL(url); }
 }
 
+// ---------- Feld-Tagebuch, Weide-Planer, Zaun-Kontrolle, Ernte ----------
+let logs = [];
+let harvest = [];
+let mapMode = LS('hofkarte_mode') || '';
+const LOG_TYPES = {
+  gemaeht: '✂️ Gemäht', geduengt: '🌱 Gedüngt', guelle: '💧 Gülle ausgebracht', mist: '🟤 Mist ausgebracht', nachgesaet: '🌾 Nachgesät',
+  geschleppt: '🚜 Geschleppt / gewalzt', zaun: '🔧 Zaun repariert', kontrolle: '✅ Kontrolliert', auftrieb: '🐄 Tiere aufgetrieben', abtrieb: '🏠 Tiere abgetrieben', sonstiges: '📝 Sonstiges',
+};
+const ANIMALS = ['Mutterkühe', 'Kühe mit Kälbern', 'Kalbinnen', 'Stiere', 'Pferde', 'Ponys', 'Schafe', 'Ziegen'];
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const dayDiff = (a, b) => Math.round((Date.parse(`${b}T12:00:00`) - Date.parse(`${a}T12:00:00`)) / 86400000);
+const fmtDay = (s) => (s ? new Date(`${s}T12:00:00`).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '');
+const daysText = (n) => (n <= 0 ? 'heute' : n === 1 ? 'seit gestern' : `seit ${n} Tagen`);
+const logsOf = (id) => logs.filter((l) => l.featureId === id).sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+const isPasture = (f) => f.kind === 'area' && (f.cat === 'weide' || f.cat === 'wiese');
+const isField = (f) => f.kind === 'area' && ['wiese', 'weide', 'flaeche'].includes(f.cat);
+const haOf = (f) => areaOf(f.coords) / 10000;
+const curYear = () => String(new Date().getFullYear());
+function harvestOf(f, year) {
+  const l = harvest.filter((e) => (e.fieldId === f.id || (!e.fieldId && (e.field || '').trim().toLowerCase() === (f.title || '').trim().toLowerCase())) && String(e.year || (e.date || '').slice(0, 4)) === year);
+  return { bales: l.reduce((s, e) => s + (e.bales || 0), 0), cuts: l.length ? Math.max(...l.map((e) => e.cut || 1)) : 0 };
+}
+// Zaun: Tage seit der letzten Kontrolle
+const fenceAge = (f) => (f.lastCheck ? dayDiff(f.lastCheck, todayStr()) : null);
+const fenceColor = (f) => { const a = fenceAge(f); return a == null ? '#d32f2f' : a <= 14 ? '#2e7d32' : a <= 60 ? '#ef8f00' : '#d32f2f'; };
+// Ertrag: Ballen pro ha in diesem Jahr -> Farbe
+function yieldColor(f) {
+  const h = harvestOf(f, curYear());
+  if (!h.bales) return '#9e9e9e';
+  const perHa = h.bales / Math.max(haOf(f), 0.01);
+  const all = features.filter(isField).map((x) => harvestOf(x, curYear()).bales / Math.max(haOf(x), 0.01)).filter((v) => v > 0);
+  const max = Math.max(...all, 1); const min = Math.min(...all, 0);
+  const t = max > min ? (perHa - min) / (max - min) : 1;
+  const hue = Math.round(30 + t * 90); // orange -> grün
+  return `hsl(${hue}, 70%, 40%)`;
+}
+function featureLabel(f) {
+  let t = f.title || '';
+  if (f.kind === 'area' && isField(f)) t += `${t ? ' · ' : ''}${fmtN(haOf(f), 2)} ha`;
+  if (f.grazing && f.grazing.count) t += ` · 🐄 ${f.grazing.count}`;
+  if (mapMode === 'ertrag' && isField(f)) { const h = harvestOf(f, curYear()); if (h.bales) t += ` · ${h.bales} Ballen`; }
+  if (mapMode === 'zaun' && f.cat === 'zaun') { const a = fenceAge(f); t += ` · ${a == null ? 'nie kontrolliert' : a === 0 ? 'heute' : `vor ${a} T.`}`; }
+  return t;
+}
+
+function addLog(f, type, note, date) {
+  const l = { featureId: f.id, featureTitle: f.title || catOf(f).label, date: date || todayStr(), type, note: note || '', by: userName(), createdAt: Date.now() };
+  l.id = store.addLog(l);
+  logs = [...logs.filter((x) => x.id !== l.id), l];
+  return l;
+}
+
+// Detail-Abschnitte für ein Objekt
+function extraDetailHtml(f) {
+  let h = '';
+  if (isField(f)) {
+    const y = curYear(); const a = harvestOf(f, y); const b = harvestOf(f, String(+y - 1));
+    if (a.bales || b.bales) {
+      const ha = haOf(f);
+      h += `<div class="section-title">Ernte</div><div class="card"><dl class="kv">
+        <dt>${y}</dt><dd>${a.bales ? `${a.bales} Ballen · ${a.cuts}. Schnitt${ha ? ` · ${fmtN(a.bales / ha, 1)}/ha` : ''}` : 'noch nichts'}</dd>
+        <dt>${+y - 1}</dt><dd>${b.bales ? `${b.bales} Ballen${ha ? ` · ${fmtN(b.bales / ha, 1)}/ha` : ''}` : '–'}</dd></dl>
+        <p class="hint" style="margin:6px 0 0">Ballen trägst du in der Maschinen-App unter „Ernte“ ein.</p></div>`;
+    }
+  }
+  if (isPasture(f)) {
+    const g = f.grazing;
+    const lastOff = logsOf(f.id).find((l) => l.type === 'abtrieb');
+    h += `<div class="section-title">Weide</div><div class="card">${g && g.count
+      ? `<b>🐄 ${esc(g.count)} ${esc(g.what || 'Tiere')}</b> <span class="muted">${daysText(dayDiff(g.since, todayStr()))}</span>${g.since ? ` <small class="muted">(seit ${fmtDay(g.since)})</small>` : ''}
+         <button class="btn" id="dGrazeOff" style="margin-top:10px">Tiere abtreiben</button>`
+      : `<span class="muted">Gerade keine Tiere drauf${lastOff ? ` – leer ${daysText(dayDiff(lastOff.date, todayStr()))}` : ''}.</span>
+         <button class="btn" id="dGrazeOn" style="margin-top:10px">🐄 Tiere auftreiben</button>`}</div>`;
+  }
+  if (f.cat === 'zaun') {
+    const a = fenceAge(f);
+    h += `<div class="section-title">Zaun-Kontrolle</div><div class="card">
+      <span style="color:${fenceColor(f)};font-weight:700">${a == null ? 'Noch nie kontrolliert' : `Zuletzt kontrolliert ${a === 0 ? 'heute' : `vor ${a} Tagen`}`}</span>${f.lastCheck ? ` <small class="muted">(${fmtDay(f.lastCheck)}${f.lastCheckBy ? ` · ${esc(f.lastCheckBy)}` : ''})</small>` : ''}
+      <div class="btn-row" style="margin-top:10px;grid-template-columns:1fr 1fr"><button class="btn primary" id="dFenceOk">✅ Heute kontrolliert</button><button class="btn" id="dFenceFix">🔧 Repariert</button></div></div>`;
+  }
+  const ls = logsOf(f.id);
+  h += `<div class="section-title">Tagebuch</div>
+    ${ls.length ? `<div class="list">${ls.slice(0, 15).map((l) => `<div class="list-item log-item"><span class="info"><span class="name">${esc(LOG_TYPES[l.type] || l.type)}</span>
+      <small>${esc([fmtDay(l.date), l.note, l.by].filter(Boolean).join(' · '))}</small></span><button class="icon-btn" data-ldel="${esc(l.id)}" aria-label="Eintrag löschen">${svg('trash')}</button></div>`).join('')}</div>
+      ${ls.length > 15 ? `<p class="hint">${ls.length - 15} ältere Einträge sind im Export enthalten.</p>` : ''}` : '<p class="hint">Noch keine Einträge – z. B. gemäht, gedüngt, Zaun repariert.</p>'}
+    <button class="btn" id="dLogAdd">${svg('plus')}Tagebuch-Eintrag</button>`;
+  return h;
+}
+function bindExtraDetail(f, body) {
+  const rerender = () => showView(viewDetail(f.id));
+  const on = $('#dGrazeOn', body); if (on) on.onclick = () => pushView(viewGraze(f));
+  const off = $('#dGrazeOff', body);
+  if (off) off.onclick = () => {
+    const g = f.grazing || {};
+    addLog(f, 'abtrieb', `${g.count || ''} ${g.what || ''}`.trim() + (g.since ? ` (${dayDiff(g.since, todayStr())} Tage)` : ''));
+    store.saveFeature(f.id, { grazing: null }); f.grazing = null; toast('Abgetrieben'); rerender();
+  };
+  const ok = $('#dFenceOk', body);
+  if (ok) ok.onclick = () => { const d = todayStr(); store.saveFeature(f.id, { lastCheck: d, lastCheckBy: userName() }); f.lastCheck = d; f.lastCheckBy = userName(); addLog(f, 'kontrolle'); toast('Als kontrolliert eingetragen'); renderFeatures(); rerender(); };
+  const fix = $('#dFenceFix', body);
+  if (fix) fix.onclick = () => pushView(viewLogForm(f, 'zaun'));
+  $('#dLogAdd', body).onclick = () => pushView(viewLogForm(f));
+  $$('[data-ldel]', body).forEach((b) => (b.onclick = () => { if (!confirm('Diesen Tagebuch-Eintrag löschen?')) return; store.deleteLog(b.dataset.ldel); logs = logs.filter((l) => l.id !== b.dataset.ldel); rerender(); }));
+}
+
+function viewLogForm(f, preset) {
+  return () => ({
+    title: `Tagebuch – ${f.title || catOf(f).label}`,
+    html: `
+      <div class="chips" id="lgType">${Object.entries(LOG_TYPES).filter(([k]) => !['auftrieb', 'abtrieb'].includes(k)).map(([k, v]) => `<button class="chip ${k === (preset || 'gemaeht') ? 'on' : ''}" data-t="${k}">${v}</button>`).join('')}</div>
+      <label class="field"><span>Datum</span><input class="input" id="lgDate" type="date" value="${todayStr()}"></label>
+      <label class="field"><span>Notiz (optional)</span><textarea class="input" id="lgNote" rows="2" placeholder="z. B. 15 m³ Gülle, Zaun beim Bach neu gespannt"></textarea></label>
+      <button class="btn primary" id="lgSave">Speichern</button>`,
+    mount(body) {
+      let type = preset || 'gemaeht';
+      $$('#lgType [data-t]', body).forEach((b) => (b.onclick = () => { type = b.dataset.t; $$('#lgType .chip', body).forEach((x) => x.classList.toggle('on', x === b)); }));
+      $('#lgSave', body).onclick = () => {
+        const date = $('#lgDate', body).value || todayStr();
+        addLog(f, type, $('#lgNote', body).value.trim(), date);
+        if (f.cat === 'zaun' && (type === 'zaun' || type === 'kontrolle') && (!f.lastCheck || date >= f.lastCheck)) { store.saveFeature(f.id, { lastCheck: date, lastCheckBy: userName() }); f.lastCheck = date; renderFeatures(); }
+        toast('Eingetragen'); backView();
+      };
+    },
+  });
+}
+function viewGraze(f) {
+  return () => ({
+    title: `Tiere auftreiben – ${f.title || catOf(f).label}`,
+    html: `
+      <div class="chips" id="gzWhat">${ANIMALS.map((a, i) => `<button class="chip ${i === 0 ? 'on' : ''}" data-a="${esc(a)}">${esc(a)}</button>`).join('')}</div>
+      <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label class="field"><span>Anzahl</span><input class="input" id="gzCount" inputmode="numeric" placeholder="z. B. 12"></label>
+        <label class="field"><span>Seit</span><input class="input" id="gzSince" type="date" value="${todayStr()}"></label>
+      </div>
+      <label class="field"><span>Andere Tiere / Notiz</span><input class="input" id="gzOther" placeholder="optional"></label>
+      <button class="btn primary" id="gzSave">Speichern</button>`,
+    mount(body) {
+      let what = ANIMALS[0];
+      $$('#gzWhat [data-a]', body).forEach((b) => (b.onclick = () => { what = b.dataset.a; $$('#gzWhat .chip', body).forEach((x) => x.classList.toggle('on', x === b)); }));
+      $('#gzSave', body).onclick = () => {
+        const count = num($('#gzCount', body).value);
+        if (!count) { toast('Bitte die Anzahl eingeben'); $('#gzCount', body).focus(); return; }
+        const other = $('#gzOther', body).value.trim();
+        const g = { what: other || what, count, since: $('#gzSince', body).value || todayStr() };
+        store.saveFeature(f.id, { grazing: g }); f.grazing = g;
+        addLog(f, 'auftrieb', `${count} ${g.what}`, g.since);
+        toast('Aufgetrieben'); renderFeatures(); backView();
+      };
+    },
+  });
+}
+function viewPastures() {
+  return () => {
+    const ps = features.filter(isPasture);
+    const rows = ps.map((f) => {
+      const g = f.grazing;
+      const lastOff = logsOf(f.id).find((l) => l.type === 'abtrieb');
+      return { f, occ: !!(g && g.count), sub: g && g.count ? `🐄 ${g.count} ${g.what || ''} · ${daysText(dayDiff(g.since, todayStr()))}` : lastOff ? `leer ${daysText(dayDiff(lastOff.date, todayStr()))}` : 'leer', days: g && g.count ? dayDiff(g.since, todayStr()) : lastOff ? dayDiff(lastOff.date, todayStr()) : 9999 };
+    }).sort((a, b) => b.occ - a.occ || b.days - a.days);
+    const total = rows.filter((r) => r.occ).reduce((s, r) => s + (+r.f.grazing.count || 0), 0);
+    return {
+      title: 'Weide-Planer',
+      tall: true,
+      html: ps.length ? `<p class="hint" style="margin-top:0">${rows.filter((r) => r.occ).length} von ${ps.length} Weiden/Wiesen belegt · ${total} Tiere draußen. Leere Flächen sind nach Ruhezeit sortiert (längste zuerst).</p>
+        <div class="list">${rows.map((r) => `<button class="list-item" data-id="${esc(r.f.id)}">${sw(catOf(r.f))}<span class="info"><span class="name">${esc(r.f.title || catOf(r.f).label)}</span><small>${esc(`${fmtN(haOf(r.f), 2)} ha · ${r.sub}`)}</small></span>${r.occ ? '<span class="badge-occ">belegt</span>' : ''}</button>`).join('')}</div>`
+        : '<div class="empty">Noch keine Weiden oder Wiesen eingezeichnet. Tipp auf + und wähle „Weide“ oder „Wiese / Feld“.</div>',
+      mount(body) { $$('[data-id]', body).forEach((b) => (b.onclick = () => { const f = features.find((x) => x.id === b.dataset.id); zoomTo(f, true); selectedId = f.id; renderFeatures(); pushView(viewDetail(f.id)); })); },
+    };
+  };
+}
+function viewFences() {
+  return () => {
+    const fs = features.filter((f) => f.cat === 'zaun').sort((a, b) => (fenceAge(b) ?? 99999) - (fenceAge(a) ?? 99999));
+    const len = fs.reduce((s, f) => s + lineLength(f.coords), 0);
+    return {
+      title: 'Zaun-Kontrolle',
+      tall: true,
+      html: fs.length ? `<p class="hint" style="margin-top:0">${fs.length} Zäune · ${fmtLen(len)} gesamt. Ganz oben steht, was am längsten nicht kontrolliert wurde. Auf der Karte: grün = in den letzten 2 Wochen, orange = bis 2 Monate, rot = länger.</p>
+        <div class="list">${fs.map((f) => { const a = fenceAge(f); return `<div class="list-item"><span class="sw" style="background:${fenceColor(f)}">${svg('fence')}</span>
+          <button class="info" data-id="${esc(f.id)}" style="text-align:left"><span class="name">${esc(f.title || 'Zaun')}</span><small>${esc(`${fmtLen(lineLength(f.coords))} · ${a == null ? 'nie kontrolliert' : a === 0 ? 'heute kontrolliert' : `vor ${a} Tagen`}`)}</small></button>
+          <button class="btn small" data-ok="${esc(f.id)}">✅</button></div>`; }).join('')}</div>
+        <button class="btn" id="fzMap">Auf der Karte farbig anzeigen</button>`
+        : '<div class="empty">Noch keine Zäune eingezeichnet. Tipp auf + und wähle „Zaun“.</div>',
+      mount(body) {
+        $$('[data-id]', body).forEach((b) => (b.onclick = () => { const f = features.find((x) => x.id === b.dataset.id); zoomTo(f, true); selectedId = f.id; renderFeatures(); pushView(viewDetail(f.id)); }));
+        $$('[data-ok]', body).forEach((b) => (b.onclick = () => { const f = features.find((x) => x.id === b.dataset.ok); const d = todayStr(); store.saveFeature(f.id, { lastCheck: d, lastCheckBy: userName() }); f.lastCheck = d; f.lastCheckBy = userName(); addLog(f, 'kontrolle'); toast(`${f.title || 'Zaun'}: kontrolliert`); renderFeatures(); showView(viewFences()); }));
+        const m = $('#fzMap', body); if (m) m.onclick = () => { mapMode = 'zaun'; LS('hofkarte_mode', mapMode); renderFeatures(); closeSheet(); };
+      },
+    };
+  };
+}
+function logCsv() {
+  const cell = (v) => { const s = String(v ?? ''); return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const rows = [['Datum', 'Fläche / Objekt', 'Art', 'Was', 'Notiz', 'Von']];
+  [...logs].sort((a, b) => (a.date || '').localeCompare(b.date || '')).forEach((l) => {
+    const f = features.find((x) => x.id === l.featureId);
+    rows.push([fmtDay(l.date), f ? f.title || catOf(f).label : l.featureTitle || '', f ? catOf(f).label : '', (LOG_TYPES[l.type] || l.type).replace(/^\S+\s/, ''), l.note || '', l.by || '']);
+  });
+  return '﻿' + rows.map((r) => r.map(cell).join(';')).join('\r\n');
+}
+
 // ---------- Ansicht: Liste ----------
 let listFilter = '';
 let listQuery = '';
+function areaSummary() {
+  const sums = {};
+  features.filter((f) => f.kind === 'area').forEach((f) => { sums[f.cat] = (sums[f.cat] || 0) + haOf(f); });
+  const parts = Object.entries(sums).map(([k, v]) => `${esc((CATS[k] || CATS.flaeche).label)}: <b>${fmtN(v, 2)} ha</b>`);
+  return parts.length ? `<p class="hint" style="margin:0 0 10px">${parts.join(' · ')}</p>` : '';
+}
 function viewList() {
   return () => ({
     title: `Alles am Hof (${features.length})`,
@@ -624,6 +836,7 @@ function viewList() {
     html: `
       <input class="input" id="lQ" type="search" placeholder="Suchen …" value="${esc(listQuery)}" style="margin-bottom:10px" autocomplete="off">
       <div class="chips" id="lChips">${[['', 'Alle'], ['point', 'Punkte'], ['line', 'Leitungen'], ['area', 'Flächen']].map(([k, l]) => `<button class="chip ${k === listFilter ? 'on' : ''}" data-k="${k}">${l}</button>`).join('')}</div>
+      ${areaSummary()}
       <div id="lItems"></div>
       <div class="section-title">Auf der Karte anzeigen</div>
       <div class="list">${Object.entries(CATS).filter(([k]) => features.some((f) => f.cat === k)).map(([k, c]) => `
@@ -668,9 +881,12 @@ function viewLayers() {
         <label class="toggle"><span>Bezeichnungen der Einträge</span><input type="checkbox" id="lyLabels" ${showLabels ? 'checked' : ''}></label>
         ${wmsLayers.map((w) => `<label class="toggle"><span>${esc(w.name)}</span><input type="checkbox" data-wms="${w.i}" ${w.on ? 'checked' : ''}></label>`).join('')}
       </div>
+      <div class="section-title">Farben auf der Karte</div>
+      <div class="list">${[['', 'Normal'], ['ertrag', 'Ertrag: Ballen pro Hektar (dieses Jahr)'], ['zaun', 'Zaun-Kontrolle (grün / orange / rot)']].map(([k, l]) => `<button class="radio-row" data-mode="${k}">${esc(l)}${k === mapMode ? `<span class="check">${svg('check')}</span>` : ''}</button>`).join('')}</div>
       ${wmsLayers.length ? '' : '<p class="hint">Grundstücksgrenzen aus SAGIS lassen sich in <b>config.js</b> als zusätzliche Ebene eintragen (siehe Anleitung).</p>'}`,
     mount(body) {
       $$('[data-base]', body).forEach((b) => (b.onclick = () => { setBase(b.dataset.base); showView(viewLayers); }));
+      $$('[data-mode]', body).forEach((b) => (b.onclick = () => { mapMode = b.dataset.mode; LS('hofkarte_mode', mapMode); renderFeatures(); showView(viewLayers); }));
       $('#lyStreet', body).onchange = (e) => { showStreetLabels = e.target.checked; LS('hofkarte_streetlabels', showStreetLabels); updateLabelLayer(); };
       $('#lyLabels', body).onchange = (e) => { showLabels = e.target.checked; LS('hofkarte_labels', showLabels); renderFeatures(); };
       $$('[data-wms]', body).forEach((cb) => (cb.onchange = () => { const w = wmsLayers[+cb.dataset.wms]; w.on = cb.checked; LS(`hofkarte_wms_${w.i}`, w.on); updateWms(); }));
@@ -684,6 +900,12 @@ function viewMore() {
     title: 'Mehr',
     html: `
       <div class="list">
+        <a class="radio-row" href="../" style="text-decoration:none;color:inherit">${svg('home')} Alle Hof-Apps</a>
+        <button class="radio-row" id="mPast">${svg('grass')} Weide-Planer</button>
+        <button class="radio-row" id="mFence">${svg('fence')} Zaun-Kontrolle</button>
+        <button class="radio-row" id="mLog">${svg('down')} Feld-Tagebuch als Tabelle (Excel)</button>
+      </div>
+      <div class="list" style="margin-top:10px">
         <button class="radio-row" id="mHome">${svg('home')} Hof-Mittelpunkt auf aktuelle Kartenansicht setzen</button>
         <button class="radio-row" id="mGeo">${svg('down')} Export für Google Earth (KML)</button>
         <button class="radio-row" id="mJson">${svg('down')} Export als GeoJSON (für GIS)</button>
@@ -700,6 +922,9 @@ function viewMore() {
         store.saveSettings({ center: settings.center });
         toast('Hof-Mittelpunkt gespeichert'); closeSheet();
       };
+      $('#mPast', body).onclick = () => pushView(viewPastures());
+      $('#mFence', body).onclick = () => pushView(viewFences());
+      $('#mLog', body).onclick = () => saveFile(`feld-tagebuch-${todayStr()}.csv`, 'text/csv', logCsv());
       $('#mGeo', body).onclick = () => saveFile(`hofkarte-${new Date().toISOString().slice(0, 10)}.kml`, 'application/vnd.google-earth.kml+xml', toKml());
       $('#mJson', body).onclick = () => saveFile(`hofkarte-${new Date().toISOString().slice(0, 10)}.geojson`, 'application/geo+json', JSON.stringify(toGeoJson(), null, 1));
       const out = $('#mOut', body); if (out) out.onclick = () => store.signOut();
@@ -784,6 +1009,8 @@ function startApp() {
       : meta.offline || !navigator.onLine ? `${features.length} Einträge · offline` : meta.pending ? 'Wird synchronisiert …' : `${features.length} Einträge · synchronisiert`;
     renderFeatures();
   }));
+  if (store.watchLog) unsubs.push(store.watchLog((l) => { logs = l; }));
+  if (store.watchHarvest) unsubs.push(store.watchHarvest((h) => { harvest = h; if (mapMode === 'ertrag') renderFeatures(); }));
 }
 async function boot() {
   $('#fab').onclick = () => openSheet(viewNew);

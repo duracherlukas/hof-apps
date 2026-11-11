@@ -24,6 +24,8 @@
   .app .go { margin-left: auto; color: var(--muted); font-size: 22px; flex: none; }
   .tip { background: var(--card); border-radius: 18px; padding: 14px 16px; font-size: 15px; border: 1px dashed var(--line); }
   .tip b { color: var(--accent); }
+  .tip.warn { border: 2px solid #c98a00; margin-bottom: 6px; }
+  .tip.warn a { color: var(--accent); font-weight: 700; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -31,10 +33,14 @@
   <h1>Hof-Apps</h1>
   <p class="sub">Alle Apps auf einen Blick. Öffne eine App und lege sie als Symbol auf den Startbildschirm.</p>
 
+  <div class="tip warn" id="bkWarn" hidden><b>💾 Zeit für eine Sicherung</b><br><span id="bkTxt"></span><br><a href="sicherung/">Jetzt sichern ›</a></div>
   <h2>Hof</h2>
-  <a class="app" href="maschinen/"><img src="maschinen/icons/icon-192.png" alt=""><span><b>Maschinen</b><small>Pickerl, Betriebsstunden, Service und Kosten</small></span><span class="go">›</span></a>
-  <a class="app" href="hofkarte/"><img src="hofkarte/icons/icon-192.png" alt=""><span><b>Hof-Karte</b><small>Leitungen, Schieber, Kabel, Grenzsteine und Flächen</small></span><span class="go">›</span></a>
-  <a class="app" href="gaeste/admin.html"><img src="gaeste/icons/icon-192.png" alt=""><span><b>Gäste-Verwaltung</b><small>Frühstücksbestellungen, Bäckerei-Liste, Gästemappe, QR-Codes</small></span><span class="go">›</span></a>
+  <a class="app" href="maschinen/"><img src="maschinen/icons/icon-192.png" alt=""><span><b>Maschinen</b><small>Pickerl, Service, Kosten, Tankbuch und Ernte (Ballen pro Schnitt)</small></span><span class="go">›</span></a>
+  <a class="app" href="hofkarte/"><img src="hofkarte/icons/icon-192.png" alt=""><span><b>Hof-Karte</b><small>Leitungen, Flächen, Feld-Tagebuch, Weide-Planer, Zaun-Kontrolle</small></span><span class="go">›</span></a>
+  <a class="app" href="gaeste/admin.html"><img src="gaeste/icons/icon-192.png" alt=""><span><b>Gäste-Verwaltung</b><small>Belegung, Brötchen & Fleisch, Abrechnung, Gästemappe, QR-Codes</small></span><span class="go">›</span></a>
+  <a class="app" href="herde/"><img src="herde/icons/icon-192.png" alt=""><span><b>Herdenbuch</b><small>Rinder, Belegung, Abkalbung, Behandlungen und Wartezeiten</small></span><span class="go">›</span></a>
+  <a class="app" href="aufgaben/"><img src="aufgaben/icons/icon-192.png" alt=""><span><b>Aufgaben</b><small>Wer macht was bis wann – für die ganze Familie</small></span><span class="go">›</span></a>
+  <a class="app" href="sicherung/"><img src="sicherung/icons/icon-192.png" alt=""><span><b>Datensicherung</b><small>Alle Hof-Daten einmal im Monat als Datei sichern</small></span><span class="go">›</span></a>
 
   <h2>Persönlich</h2>
   <a class="app" href="kalorien/"><img src="kalorien/icons/icon-192.png" alt=""><span><b>Kalorien</b><small>Essen per Foto oder Barcode erfassen</small></span><span class="go">›</span></a>
@@ -49,5 +55,15 @@
     <b>Android:</b> App in Chrome öffnen › <b>⋮</b> › <b>App installieren</b>
   </div>
 </main>
+<script>
+  try {
+    var lb = +localStorage.getItem('hof_lastBackup') || 0;
+    var d = lb ? Math.floor((Date.now() - lb) / 86400000) : null;
+    if (d === null || d > 30) {
+      document.getElementById('bkTxt').textContent = d === null ? 'Auf diesem Gerät wurden die Hof-Daten noch nie gesichert.' : 'Die letzte Sicherung ist ' + d + ' Tage her.';
+      document.getElementById('bkWarn').hidden = false;
+    }
+  } catch (e) {}
+</script>
 </body>
 </html>

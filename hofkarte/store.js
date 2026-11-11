@@ -49,6 +49,12 @@ async function firebaseStore(fbc, fail) {
     async deletePhoto(id) { await fs.deleteDoc(fs.doc(photoCol, id)); },
     watchSettings(cb) { return fs.onSnapshot(settingsRef, (s) => cb(s.exists() ? s.data() : {}), fail); },
     saveSettings(data) { fs.setDoc(settingsRef, clean(data), { merge: true }).catch(fail); },
+    // Feld-Tagebuch
+    watchLog(cb) { return fs.onSnapshot(fs.collection(db, 'fieldlog'), (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }))), () => cb([])); },
+    addLog(data) { const id = rid(); fs.setDoc(fs.doc(db, 'fieldlog', id), clean(data)).catch(fail); return id; },
+    deleteLog(id) { fs.deleteDoc(fs.doc(db, 'fieldlog', id)).catch(fail); },
+    // Ernte aus der Maschinen-App (nur lesen)
+    watchHarvest(cb) { return fs.onSnapshot(fs.query(fs.collection(db, 'entries'), fs.where('kind', '==', 'harvest')), (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }))), () => cb([])); },
   };
 }
 
@@ -85,6 +91,15 @@ function demoStore(fail) {
     async deletePhoto(id) { delete data.photos[id]; persist(); },
     watchSettings(cb) { setSubs.add(cb); setTimeout(emit, 0); return () => setSubs.delete(cb); },
     saveSettings(s) { data.settings = { ...(data.settings || {}), ...clean(s) }; persist(); },
+    watchLog(cb) { const f = () => cb(Object.values(data.log || {})); subs.add(f); setTimeout(f, 0); return () => subs.delete(f); },
+    addLog(l) { const id = rid(); data.log = data.log || {}; data.log[id] = { ...clean(l), id }; persist(); return id; },
+    deleteLog(id) { if (data.log) delete data.log[id]; persist(); },
+    watchHarvest(cb) {
+      const r = () => { try { const d = JSON.parse(localStorage.getItem('hofmaschinen_demo')); return d && d.entries ? Object.values(d.entries).filter((e) => e.kind === 'harvest') : []; } catch (e) { return []; } };
+      setTimeout(() => cb(r()), 0);
+      const on = (e) => { if (e.key === 'hofmaschinen_demo') cb(r()); };
+      window.addEventListener('storage', on); return () => window.removeEventListener('storage', on);
+    },
   };
 }
 })();

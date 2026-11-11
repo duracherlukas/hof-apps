@@ -2,7 +2,7 @@
    Alle Daten bleiben auf dem Handy (IndexedDB). */
 (() => {
 'use strict';
-const VERSION = '1.0';
+const VERSION = '1.2';
 const DEFAULT_CENTER = { lat: 47.405, lng: 12.90, zoom: 12 }; // Maria Alm
 
 // ---------- Helfer ----------
@@ -93,7 +93,7 @@ const DB = {
 
 // ---------- Zustand ----------
 let hikes = [];
-let settings = { title: 'Mein Wandertagebuch' };
+let settings = { title: 'Mein Wandertagebuch', autoLock: true };
 let tab = 'diary';
 let statsYear = String(new Date().getFullYear());
 const urlCache = new Map();
@@ -257,6 +257,12 @@ function diaryHtml() {
       <button class="big-btn" id="bNew"><span class="ic">${svg('pen')}</span><b>Eintragen</b><small>Wanderung nachträglich ins Tagebuch schreiben</small></button>
       <button class="big-btn rec-btn" id="bRec"><span class="ic">${svg('gps')}</span><b>Aufzeichnen</b><small>Jetzt losgehen – Strecke wird per GPS mitgeschrieben</small></button>
     </div>`;
+  const lb = settings.lastBackup || 0;
+  if (list.length >= 3 && Date.now() - lb > 30 * 86400000) {
+    html += `<div class="card backup-card"><b>💾 Zeit für eine Sicherung</b>
+      <p>${lb ? `Letzte Sicherung vor ${Math.floor((Date.now() - lb) / 86400000)} Tagen.` : 'Deine Wanderungen und Fotos sind nur auf diesem Handy gespeichert.'} Einmal im Monat sichern – z. B. per E-Mail an dich oder in Google Drive.</p>
+      <div class="bk-btns"><button class="btn" id="bkLater">Später</button><button class="btn primary" id="bkNow">Jetzt sichern</button></div></div>`;
+  }
   if (!list.length) {
     html += '<div class="empty"><span class="big">🥾</span>Noch keine Wanderungen.<br>Tipp auf „Eintragen“ oder nimm die nächste Tour mit „Aufzeichnen“ auf.</div>';
     return html;
@@ -277,6 +283,8 @@ async function fillCovers(root) {
 function bindDiary(v) {
   $('#bNew', v).onclick = () => openSheet(viewForm(null));
   $('#bRec', v).onclick = () => startRecording();
+  const bn = $('#bkNow', v); if (bn) bn.onclick = () => backup(true);
+  const bl = $('#bkLater', v); if (bl) bl.onclick = async () => { settings.lastBackup = Date.now() - 23 * 86400000; await DB.put('state', settings, 'settings'); render(); };
   $$('[data-hike]', v).forEach((b) => (b.onclick = () => openSheet(viewDetail(b.dataset.hike))));
   fillCovers(v);
 }
@@ -333,9 +341,69 @@ function statsHtml() {
       ${recRow('🏔️', 'Höchster Gipfel', highest, highest ? `${esc(highest.peak || highest.title)} · ${fmtN(highest.peakHeight)} m` : '')}
       ${recRow('⏱️', 'Längste Dauer', dur, dur ? fmtDur(dur.durationMin) : '')}
       ${fav ? `<div class="rec-row"><span class="ic">⭐</span><span class="info"><b>${fav} Lieblingstouren</b><small>mit 5 Sternen bewertet</small></span></div>` : ''}
-    </div>` : '<div class="empty">In diesem Zeitraum gibt es noch keine Wanderungen.</div>'}`;
+    </div>` : '<div class="empty">In diesem Zeitraum gibt es noch keine Wanderungen.</div>'}
+    ${statsYear !== 'alle' && list.length ? `<button class="btn primary" id="sReview">🎉 Jahresrückblick ${esc(statsYear)} als Bild</button>
+      <p class="hint" style="text-align:center">Ein schönes Bild mit deinen Zahlen und Fotos – zum Teilen mit der Familie.</p>` : ''}`;
+}
+// ---------- Jahresrückblick als Bild ----------
+async function yearReview(year) {
+  toast('Bild wird erstellt …', 2000);
+  const list = hikes.filter((h) => yearOf(h) === year);
+  const t = totals(list);
+  const W = 1080, H = 1350;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#2d6a4f'); g.addColorStop(1, '#173d2c');
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  // Berge
+  x.fillStyle = 'rgba(255,255,255,.07)';
+  x.beginPath(); x.moveTo(0, 420); x.lineTo(260, 200); x.lineTo(420, 330); x.lineTo(640, 110); x.lineTo(860, 300); x.lineTo(1080, 180); x.lineTo(1080, 470); x.lineTo(0, 470); x.fill();
+  x.fillStyle = '#fff'; x.textAlign = 'left'; x.textBaseline = 'alphabetic';
+  x.font = '600 44px system-ui, sans-serif'; x.globalAlpha = 0.85; x.fillText(settings.title || 'Mein Wandertagebuch', 70, 120); x.globalAlpha = 1;
+  x.font = '800 96px system-ui, sans-serif'; x.fillText(`Wanderjahr ${year}`, 70, 230);
+  const stats = [[t.n, 'Touren'], [fmtKm(t.km), 'Kilometer'], [fmtN(t.up), 'Höhenmeter'], [Math.round(t.min / 60), 'Stunden']];
+  stats.forEach(([v, l], i) => {
+    const cx = 70 + (i % 2) * 480; const cy = 330 + Math.floor(i / 2) * 170;
+    x.font = '800 92px system-ui, sans-serif'; x.fillText(String(v), cx, cy + 80);
+    x.font = '500 38px system-ui, sans-serif'; x.globalAlpha = 0.8; x.fillText(l, cx, cy + 128); x.globalAlpha = 1;
+  });
+  let y = 720;
+  x.font = '500 38px system-ui, sans-serif';
+  const best = (k) => list.filter((h) => h[k]).sort((a, b) => b[k] - a[k])[0];
+  const hi = best('peakHeight'); const lo = best('km');
+  if (t.up) { x.fillText(`Das sind ${fmtN(t.up / 8849, 1)}× der Mount Everest 🏔️`, 70, y); y += 60; }
+  if (hi) { x.fillText(`Höchster Gipfel: ${(hi.peak || hi.title).slice(0, 34)} · ${fmtN(hi.peakHeight)} m`, 70, y); y += 60; }
+  if (lo) { x.fillText(`Längste Tour: ${fmtKm(lo.km)} km`, 70, y); y += 60; }
+  // Fotos: Titelbilder der best bewerteten Touren
+  const withCover = list.filter((h) => h.coverId).sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.km || 0) - (a.km || 0)).slice(0, 3);
+  const imgs = [];
+  for (const h of withCover) {
+    try {
+      const p = await DB.get('photos', h.coverId);
+      if (!p) continue;
+      const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = photoUrl(p, 'thumb'); });
+      imgs.push(im);
+    } catch (e) { /* */ }
+  }
+  if (imgs.length) {
+    const top = Math.max(y + 20, 900); const gap = 24; const sz = Math.min(300, (W - 140 - gap * (imgs.length - 1)) / imgs.length);
+    imgs.forEach((im, i) => {
+      const dx = 70 + i * (sz + gap); const s = Math.min(im.naturalWidth, im.naturalHeight);
+      x.save(); x.beginPath(); if (x.roundRect) x.roundRect(dx, top, sz, sz, 28); else x.rect(dx, top, sz, sz); x.clip();
+      x.drawImage(im, (im.naturalWidth - s) / 2, (im.naturalHeight - s) / 2, s, s, dx, top, sz, sz); x.restore();
+    });
+  }
+  x.font = '500 30px system-ui, sans-serif'; x.globalAlpha = 0.7; x.fillText('Wandertagebuch', 70, H - 60); x.globalAlpha = 1;
+  const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.9));
+  const name = `wanderjahr-${year}.jpg`;
+  const file = new File([blob], name, { type: 'image/jpeg' });
+  try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: `Wanderjahr ${year}` }); return; } } catch (e) { if (e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast('Bild gespeichert');
 }
 function bindStats(v) {
+  const rv = $('#sReview', v); if (rv) rv.onclick = () => yearReview(statsYear);
   $$('[data-year]', v).forEach((b) => (b.onclick = () => { statsYear = b.dataset.year; render(); }));
   $$('[data-hike]', v).forEach((b) => (b.onclick = () => openSheet(viewDetail(b.dataset.hike))));
 }
@@ -402,7 +470,8 @@ function viewDetail(id) {
     const facts = [];
     if (h.km) facts.push([`${fmtKm(h.km)}`, 'km']);
     if (h.up) facts.push([`${fmtN(h.up)}`, 'Hm ↑']);
-    if (h.durationMin) facts.push([fmtDur(h.durationMin).replace(' h', ''), 'Stunden']);
+    if (h.movingMin) facts.push([fmtDur(h.movingMin).replace(' h', ''), 'Gehzeit']);
+    else if (h.durationMin) facts.push([fmtDur(h.durationMin).replace(' h', ''), 'Stunden']);
     if (h.peakHeight) facts.push([`${fmtN(h.peakHeight)}`, 'm Gipfel']);
     if (h.difficulty && DIFF[h.difficulty]) facts.push([DIFF[h.difficulty][0], DIFF[h.difficulty][1]]);
     if (h.weather && WEATHER[h.weather]) facts.push([WEATHER[h.weather][0], WEATHER[h.weather][1]]);
@@ -410,6 +479,7 @@ function viewDetail(id) {
     if (h.peak) rows.push(['Gipfel', `${esc(h.peak)}${h.peakHeight ? ` (${fmtN(h.peakHeight)} m)` : ''}`]);
     if (h.start) rows.push(['Ausgangspunkt', esc(h.start)]);
     if (h.down) rows.push(['Abstieg', `${fmtN(h.down)} Hm`]);
+    if (h.movingMin && h.durationMin > h.movingMin) rows.push(['Unterwegs gesamt', `${fmtDur(h.durationMin)} (davon ${fmtDur(Math.max(0, h.durationMin - h.movingMin))} Pause)`]);
     if (h.companions) rows.push(['Mit dabei', esc(h.companions)]);
     if (h.hut) rows.push(['Einkehr', esc(h.hut)]);
     return {
@@ -671,6 +741,7 @@ function viewSettings() {
     title: 'Einstellungen',
     html: `
       <label class="field"><span>Name des Tagebuchs</span><input class="input" id="sTitle" value="${esc(settings.title)}"></label>
+      <label class="check-row"><input type="checkbox" id="sAutoLock" ${settings.autoLock !== false ? 'checked' : ''}><span>Beim Aufnehmen den Bildschirm nach 1 Minute ohne Berührung automatisch sperren</span></label>
       <button class="btn primary" id="sSave">Speichern</button>
       <div class="section-title">Sicherung</div>
       <div class="warn-box">Alles ist nur auf diesem Handy gespeichert. Mach ab und zu eine Sicherung und schick sie dir z. B. per E-Mail oder speichere sie in der Cloud.</div>
@@ -684,13 +755,15 @@ function viewSettings() {
         <b>Als App aufs Handy:</b><br>
         iPhone: in Safari auf <b>Teilen</b> › <b>Zum Home-Bildschirm</b>.<br>
         Android: in Chrome auf <b>⋮</b> › <b>App installieren</b>.<br><br>
-        <b>Aufzeichnen:</b> Die App muss dabei offen bleiben – der Bildschirm bleibt automatisch an. Handy einfach in die Jackentasche. Nach dem Beenden kannst du Fotos dazugeben.<br><br>
+        <b>Aufzeichnen:</b> Die App muss dabei offen bleiben. Vor dem Einstecken auf <b>„Sperren“</b> tippen: Der Bildschirm wird schwarz, Berührungen in der Tasche bewirken nichts, und das GPS läuft weiter. Zum Entsperren den Kreis 2 Sekunden gedrückt halten. <b>Nicht</b> die Ein/Aus-Taste drücken – dann stoppt das GPS.<br><br>
+        <b>Pausen:</b> Wenn du länger als 3 Minuten stehen bleibst, zählt das als Pause. „Gehzeit“ ist die reine Zeit in Bewegung.<br><br>
         <b>Fotos:</b> Beim Eintragen auf „Fotos dazu“ tippen und Bilder aus der Galerie wählen. Ein Foto antippen macht es zum Titelbild.
       </div>
       <p class="hint" style="text-align:center">Wandertagebuch ${VERSION}</p>`,
     mount(body) {
       $('#sSave', body).onclick = async () => {
         settings.title = $('#sTitle', body).value.trim() || 'Mein Wandertagebuch';
+        settings.autoLock = $('#sAutoLock', body).checked;
         await DB.put('state', settings, 'settings'); render(); toast('Gespeichert');
       };
       $('#sBackup', body).onclick = () => backup(true);
@@ -714,7 +787,10 @@ async function backup(withPhotos) {
   if (withPhotos) {
     for (const p of await DB.all('photos')) out.photos.push({ id: p.id, hikeId: p.hikeId, createdAt: p.createdAt, full: await blobToDataUrl(p.full), thumb: await blobToDataUrl(p.thumb) });
   }
+  settings.lastBackup = Date.now();
+  try { await DB.put('state', settings, 'settings'); } catch (e) { /* */ }
   saveFile(`wandertagebuch-${dayKey()}${withPhotos ? '' : '-ohne-fotos'}.json`, 'application/json', JSON.stringify(out));
+  if (tab === 'diary') render();
 }
 async function restore(file) {
   try {
@@ -751,17 +827,145 @@ let wakeLock = null;
 let lastSave = 0;
 let liveRef = null;   // Höhenbezug für Live-Höhenmeter
 let recDirty = false;
+const STOP_MS = 3 * 60 * 1000;   // so lange stehen bleiben = Pause
+const LOCK_IDLE_MS = 60 * 1000;  // automatisch sperren nach 1 Minute ohne Berührung
+let locked = false;
+let idleTimer = null;
+let planLine = null;      // geplante Route (GPX)
+let backMode = false;     // Rückweg-Hilfe aktiv
+let backLine = null;
+let startMarker = null;
+const DIRS = ['Norden', 'Nordosten', 'Osten', 'Südosten', 'Süden', 'Südwesten', 'Westen', 'Nordwesten'];
+function bearingTo(a, b) {
+  const r = Math.PI / 180;
+  const y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r);
+  const x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r);
+  return (Math.atan2(y, x) / r + 360) % 360;
+}
+const dirName = (deg) => DIRS[Math.round(deg / 45) % 8];
+let lastPos = null;
+function updateNav() {
+  const box = $('#rNavInfo');
+  if (!rec || !box) return;
+  const parts = [];
+  const start = rec.points[0];
+  if (backMode && start && lastPos) {
+    const d = dist(lastPos, start);
+    parts.push(`↩ Start: <b>${d >= 1000 ? `${fmtN(d / 1000, 1)} km` : `${fmtN(d)} m`}</b> Luftlinie Richtung <b>${dirName(bearingTo(lastPos, start))}</b>`);
+    if (backLine) backLine.setLatLngs([[lastPos[0], lastPos[1]], [start[0], start[1]]]);
+  }
+  if (rec.plan && rec.plan.length > 1 && lastPos) {
+    let best = Infinity; let bi = 0;
+    rec.plan.forEach((p, i) => { const d = dist(lastPos, p); if (d < best) { best = d; bi = i; } });
+    let rest = 0; for (let i = bi + 1; i < rec.plan.length; i++) rest += dist(rec.plan[i - 1], rec.plan[i]);
+    parts.push(best > 60 ? `⚠️ <b>${fmtN(best)} m</b> neben der Route` : `Route: noch <b>${fmtN(rest / 1000, 1)} km</b>`);
+  }
+  box.hidden = !parts.length;
+  box.innerHTML = parts.join('<br>');
+}
+function drawPlan() {
+  if (planLine) { planLine.remove(); planLine = null; }
+  if (rec && rec.plan && rec.plan.length > 1 && recMap) planLine = L.polyline(rec.plan.map((p) => [p[0], p[1]]), { color: '#1a73e8', weight: 4, dashArray: '8 8', opacity: 0.85 }).addTo(recMap);
+}
+function toggleBack() {
+  if (!rec || !rec.points.length) { toast('Noch kein Startpunkt – warte auf GPS'); return; }
+  backMode = !backMode;
+  $('#rBack').classList.toggle('on', backMode);
+  if (backLine) { backLine.remove(); backLine = null; }
+  if (startMarker) { startMarker.remove(); startMarker = null; }
+  if (backMode) {
+    const s = rec.points[0];
+    startMarker = L.marker([s[0], s[1]], { icon: L.divIcon({ className: '', html: '<div class="start-pin">S</div>', iconSize: [26, 26], iconAnchor: [13, 13] }) }).addTo(recMap);
+    backLine = L.polyline([[s[0], s[1]], [s[0], s[1]]], { color: '#e8711a', weight: 3, dashArray: '2 8' }).addTo(recMap);
+    const pts = rec.points.map((p) => [p[0], p[1]]);
+    if (pts.length > 1) recMap.fitBounds(pts, { padding: [40, 40] });
+  }
+  updateNav();
+}
+let holdTimer = null;
 
 async function keepAwake() {
   try { if ('wakeLock' in navigator && document.visibilityState === 'visible') { wakeLock = await navigator.wakeLock.request('screen'); } }
   catch (e) { /* nicht unterstützt */ }
 }
 const elapsedMs = () => (rec ? rec.elapsed + (rec.paused || !rec.resumedAt ? 0 : Date.now() - rec.resumedAt) : 0);
+// Auto-Pause: Zeit ohne Bewegung (länger als STOP_MS) zählt nicht zur Gehzeit
+const openGap = () => (rec && !rec.paused ? Math.max(0, Date.now() - (rec.lastMoveT || Date.now())) : 0);
+const autoPaused = () => openGap() > STOP_MS;
+const pauseMs = () => (rec ? (rec.stopMs || 0) + (autoPaused() ? openGap() : 0) : 0);
+const movingMs = () => Math.max(0, elapsedMs() - pauseMs());
+const fmtClock = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`; };
+function closeGap(t) { if (!rec) return; const g = t - (rec.lastMoveT || t); if (g > STOP_MS) rec.stopMs = (rec.stopMs || 0) + g; rec.lastMoveT = t; }
+
+// ---------- Taschen-Sperre ----------
+function lockScreen() {
+  if (!rec || locked) return;
+  locked = true;
+  cancelHold();
+  $('#lock').hidden = false;
+  try { history.pushState({ wtbLock: 1 }, ''); } catch (e) { /* */ }
+  updateLockUi();
+}
+function unlockScreen() {
+  locked = false;
+  cancelHold();
+  $('#lock').hidden = true;
+  resetIdle();
+}
+function cancelHold() { clearTimeout(holdTimer); holdTimer = null; const h = $('#lHold'); if (h) h.classList.remove('holding'); }
+function resetIdle() {
+  clearTimeout(idleTimer);
+  if (!rec || locked || settings.autoLock === false) return;
+  idleTimer = setTimeout(() => { if (rec && !locked && $('#rec') && !$('#rec').hidden && $('#sheet').hidden) lockScreen(); else resetIdle(); }, LOCK_IDLE_MS);
+}
+function updateLockUi() {
+  if (!locked || !rec) return;
+  $('#lTime').textContent = fmtClock(movingMs());
+  $('#lDist').textContent = `${fmtN(rec.dist / 1000, 1)} km`;
+  $('#lStatus').textContent = rec.paused ? 'Pausiert' : autoPaused() ? 'Pause erkannt' : 'Aufnahme läuft';
+}
+(function setupLock() {
+  const lock = $('#lock');
+  const hold = $('#lHold');
+  // alles blockieren, was in der Tasche ausgelöst werden könnte
+  ['click', 'dblclick', 'contextmenu', 'touchmove', 'wheel', 'gesturestart'].forEach((ev) => lock.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, { passive: false }));
+  lock.addEventListener('touchstart', (e) => { if (!hold.contains(e.target)) e.preventDefault(); }, { passive: false });
+  const start = (e) => {
+    e.preventDefault();
+    cancelHold();
+    void hold.offsetWidth; // Animation neu starten
+    hold.classList.add('holding');
+    holdTimer = setTimeout(unlockScreen, 2000);
+  };
+  hold.addEventListener('pointerdown', start);
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => hold.addEventListener(ev, cancelHold));
+  // Zurück-Geste darf die Sperre nicht aufheben
+  window.addEventListener('popstate', () => { if (locked) { try { history.pushState({ wtbLock: 1 }, ''); } catch (e) { /* */ } } });
+  document.addEventListener('pointerdown', () => { if (!locked) resetIdle(); }, true);
+  document.addEventListener('keydown', (e) => { if (locked) { e.preventDefault(); e.stopPropagation(); } }, true);
+})();
+$('#rLock').onclick = lockScreen;
+$('#rBack').onclick = toggleBack;
+$('#rRoute').onclick = () => $('#rRouteFile').click();
+$('#rRouteFile').onchange = async (ev) => {
+  const f = ev.target.files[0]; ev.target.value = '';
+  if (!f || !rec) return;
+  try {
+    const g = parseGpx(await f.text());
+    rec.plan = simplify(g.points, 15).map((p) => [p[0], p[1]]).slice(0, 3000);
+    drawPlan(); persistRec();
+    recMap.fitBounds(rec.plan, { padding: [30, 30] });
+    toast(`Route geladen${g.name ? `: ${g.name}` : ''} (${fmtN(analyze(rec.plan.map((p) => [p[0], p[1], null, null]), 5).km, 1)} km)`, 3500);
+    updateNav();
+  } catch (e) { toast(e.message || 'Diese Datei passt nicht', 3500); }
+};
 async function persistRec() { if (rec) { lastSave = Date.now(); recDirty = false; try { await DB.put('state', rec, 'rec'); } catch (e) { /* */ } } }
 
 function startRecording(resume) {
   if (!('geolocation' in navigator)) { toast('Dieses Gerät kann keinen Standort bestimmen'); return; }
-  if (!resume) rec = { points: [], startedAt: Date.now(), elapsed: 0, resumedAt: Date.now(), paused: false, up: 0, dist: 0 };
+  if (!resume) rec = { points: [], startedAt: Date.now(), elapsed: 0, resumedAt: Date.now(), paused: false, up: 0, dist: 0, stopMs: 0, lastMoveT: Date.now() };
+  if (rec.stopMs == null) rec.stopMs = 0;
+  if (!rec.lastMoveT) rec.lastMoveT = Date.now();
   liveRef = null;
   $('#rec').hidden = false;
   $('#rPause').textContent = rec.paused ? 'Weiter' : 'Pause';
@@ -772,6 +976,10 @@ function startRecording(resume) {
   recMap.setView([c.lat, c.lng], 15);
   if (recLine) recLine.remove();
   recLine = L.polyline(rec.points.map((p) => [p[0], p[1]]), { color: trackColor, weight: 5 }).addTo(recMap);
+  backMode = false; $('#rBack').classList.remove('on');
+  if (backLine) { backLine.remove(); backLine = null; }
+  if (startMarker) { startMarker.remove(); startMarker = null; }
+  drawPlan(); updateNav();
   keepAwake();
   recWatch = navigator.geolocation.watchPosition(onPos, (err) => {
     $('#recStatus').textContent = err.code === 1 ? 'Standort nicht erlaubt – bitte in den Handy-Einstellungen erlauben' : 'Kein GPS-Signal …';
@@ -781,23 +989,27 @@ function startRecording(resume) {
   recTimer = setInterval(updateRecUi, 1000);
   updateRecUi();
   persistRec();
+  resetIdle();
 }
 function onPos(pos) {
   if (!rec) return;
   const { latitude: lat, longitude: lng, altitude, accuracy } = pos.coords;
   const ll = [lat, lng];
+  if (accuracy <= 60) { lastPos = [lat, lng]; updateNav(); }
   if (!recMe) recMe = L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), interactive: false }).addTo(recMap);
   else recMe.setLatLng(ll);
   recMap.panTo(ll, { animate: true });
   const st = $('#recStatus');
   if (rec.paused) { st.textContent = 'Pausiert'; st.classList.remove('ok'); return; }
   if (accuracy > 35) { st.textContent = `GPS noch ungenau (± ${fmtN(accuracy)} m) …`; st.classList.remove('ok'); return; }
-  st.textContent = `Aufnahme läuft · GPS ± ${fmtN(accuracy)} m`; st.classList.add('ok');
+  rec.acc = accuracy;
+  setRecStatus();
   const ele = altitude != null && Number.isFinite(altitude) ? Math.round(altitude) : null;
   const p = [lat, lng, ele, Date.now()];
   const prev = rec.points[rec.points.length - 1];
   if (prev && dist(prev, p) < Math.max(6, accuracy * 0.6)) { if (ele != null) $('#rAlt').textContent = fmtN(ele); return; }
   if (prev) rec.dist += dist(prev, p);
+  closeGap(p[3]);
   if (ele != null) {
     if (liveRef == null) liveRef = ele;
     else if (ele - liveRef >= 5) { rec.up += ele - liveRef; liveRef = ele; } else if (liveRef - ele >= 5) liveRef = ele;
@@ -808,11 +1020,21 @@ function onPos(pos) {
   if (Date.now() - lastSave > 5000) persistRec();
   updateRecUi(ele);
 }
+function setRecStatus() {
+  const st = $('#recStatus');
+  if (!rec || rec.paused) return;
+  if (autoPaused()) { st.textContent = 'Pause erkannt – die Gehzeit steht'; st.classList.remove('ok'); return; }
+  if (rec.acc == null) return;
+  st.textContent = `Aufnahme läuft · GPS ± ${fmtN(rec.acc)} m`; st.classList.add('ok');
+}
 function updateRecUi(ele) {
   if (!rec) return;
   if (recDirty && Date.now() - lastSave > 3000) persistRec();
-  const s = Math.floor(elapsedMs() / 1000);
-  $('#rTime').textContent = `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+  $('#rTime').textContent = fmtClock(movingMs());
+  const pm = Math.round(pauseMs() / 60000);
+  $('#rPauseInfo').textContent = pm ? `Pausen: ${pm < 60 ? `${pm} Min.` : fmtDur(pm)}` : '';
+  setRecStatus();
+  updateLockUi();
   $('#rDist').textContent = fmtN(rec.dist / 1000, 1);
   $('#rUp').textContent = fmtN(rec.up);
   if (ele != null) $('#rAlt').textContent = fmtN(ele);
@@ -824,21 +1046,29 @@ function stopWatching() {
 }
 $('#rPause').onclick = () => {
   if (!rec) return;
-  if (rec.paused) { rec.paused = false; rec.resumedAt = Date.now(); $('#rPause').textContent = 'Pause'; }
-  else { rec.elapsed = elapsedMs(); rec.paused = true; $('#rPause').textContent = 'Weiter'; $('#recStatus').textContent = 'Pausiert'; $('#recStatus').classList.remove('ok'); }
+  if (rec.paused) { rec.paused = false; rec.resumedAt = Date.now(); rec.lastMoveT = Date.now(); $('#rPause').textContent = 'Pause'; }
+  else { closeGap(Date.now()); rec.elapsed = elapsedMs(); rec.paused = true; $('#rPause').textContent = 'Weiter'; $('#recStatus').textContent = 'Pausiert'; $('#recStatus').classList.remove('ok'); }
   persistRec();
 };
 $('#rStop').onclick = async () => {
   if (!rec) return;
   if (!confirm('Wanderung beenden und speichern?')) return;
+  if (!rec.paused) closeGap(Date.now());
   const total = elapsedMs();
+  const moving = Math.max(0, total - (rec.stopMs || 0));
   stopWatching();
+  clearTimeout(idleTimer);
+  if (locked) unlockScreen();
+  if (planLine) { planLine.remove(); planLine = null; }
+  if (backLine) { backLine.remove(); backLine = null; }
+  if (startMarker) { startMarker.remove(); startMarker = null; }
+  backMode = false; $('#rNavInfo').hidden = true;
   const pts = simplify(rec.points);
   const a = analyze(pts, 5);
   const hike = {
     id: uid(), date: dayKey(new Date(rec.startedAt)), title: '', rating: 0,
     km: pts.length > 1 ? Math.round(a.km * 10) / 10 : null, up: rec.up ? Math.round(rec.up) : (a.up || null), down: a.down || null,
-    durationMin: Math.round(total / 60000) || null, peakHeight: a.maxEle, track: pts.length > 1 ? pts : null,
+    durationMin: Math.round(total / 60000) || null, movingMin: Math.round(moving / 60000) || null, peakHeight: a.maxEle, track: pts.length > 1 ? pts : null,
     loc: pts.length === 1 ? { lat: pts[0][0], lng: pts[0][1] } : null, createdAt: Date.now(),
   };
   hike.title = `Wanderung am ${fmtDate(hike.date, { day: 'numeric', month: 'long' })}`;

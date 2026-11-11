@@ -1,6 +1,6 @@
 // Service Worker für die Verwaltung (offline starten). Nach Updates Versionsnummer erhöhen.
-const CACHE = 'gaeste-v4';
-const FILES = ['admin.html', 'index.html', 'style.css', 'common.js', 'admin.js', 'guest.js', 'config.js', 'vendor/qrcode.js',
+const CACHE = 'gaeste-v6';
+const FILES = ['admin.html', 'index.html', 'style.css', 'common.js', 'i18n.js', 'admin.js', 'guest.js', 'config.js', 'vendor/qrcode.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
