@@ -2,7 +2,7 @@
    Alle Daten bleiben nur auf diesem Gerät (localStorage). */
 (() => {
 'use strict';
-const VERSION = '1.3';
+const VERSION = '1.4';
 const KEY = 'ausgaben_v1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -47,7 +47,8 @@ function load() {
   try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tx) return { ...DEFAULT(), ...d, settings: { ...DEFAULT().settings, ...(d.settings || {}) } }; } catch (e) { /* */ }
   return DEFAULT();
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Speicher voll – bitte eine Sicherung machen und alte Jahre löschen', 5000); } }
+let settleCache = {};
+function save() { settleCache = {}; try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Speicher voll – bitte eine Sicherung machen und alte Jahre löschen', 5000); } }
 
 let tt;
 function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), ms); }
@@ -96,7 +97,7 @@ const BRANDS = [
 const PREFIX = [['eurospar', 'Eurospar', 'lebensmittel'], ['interspar', 'Interspar', 'lebensmittel'], ['sparkasse', null, null], ['spar', 'Spar', 'lebensmittel'], ['billa', 'Billa', 'lebensmittel'], ['hofer', 'Hofer', 'lebensmittel'],
   ['lidl', 'Lidl', 'lebensmittel'], ['penny', 'Penny', 'lebensmittel'], ['mpreis', 'MPreis', 'lebensmittel'], ['unimarkt', 'Unimarkt', 'lebensmittel'], ['nahfrisch', 'Nah & Frisch', 'lebensmittel'], ['lagerhaus', 'Lagerhaus', 'landwirtschaft'],
   ['omv', 'OMV', 'tanken'], ['shell', 'Shell', 'tanken'], ['avanti', 'Avanti', 'tanken'], ['turmoel', 'Turmöl', 'tanken'], ['bipa', 'Bipa', 'drogerie'], ['dmdrogerie', 'dm drogerie markt', 'drogerie'], ['mueller', 'Müller', 'drogerie'],
-  ['mcdonald', "McDonald's", 'essen'], ['burgerking', 'Burger King', 'essen'], ['hornbach', 'Hornbach', 'bau'], ['xxxlutz', 'XXXLutz', 'wohnen'], ['ikea', 'IKEA', 'wohnen'], ['mediamarkt', 'MediaMarkt', 'elektronik'],
+  ['mcdonald', "McDonald's", 'essen'], ['burgerking', 'Burger King', 'essen'], ['hornbach', 'Hornbach', 'bau'], ['xxxlutz', 'XXXLutz', 'wohnen'], ['ikea', 'IKEA', 'wohnen'], ['mediamarkt', 'MediaMarkt', 'elektronik'], ['mediam', 'MediaMarkt', 'elektronik'], ['klarna', 'Klarna', 'online'],
   ['hartlauer', 'Hartlauer', 'elektronik'], ['fressnapf', 'Fressnapf', 'tiere'], ['amazon', 'Amazon', 'online'], ['amzn', 'Amazon', 'online'], ['paypal', 'PayPal', 'online'], ['netflix', 'Netflix', 'abo'], ['spotify', 'Spotify', 'abo'],
   ['oebb', 'ÖBB', 'verkehr'], ['asfinag', 'Asfinag', 'verkehr'], ['fielmann', 'Fielmann', 'apotheke'], ['deichmann', 'Deichmann', 'kleidung'], ['intersport', 'Intersport', 'freizeit'], ['hervis', 'Hervis', 'freizeit'], ['apotheke', null, 'apotheke']];
 function brandOf(text) {
@@ -108,13 +109,13 @@ function brandOf(text) {
 const SMALL = new Set(['am', 'an', 'im', 'in', 'bei', 'der', 'die', 'das', 'und', 'zum', 'zur', 'von', 'auf', 'a.', 'b.', 'st.']);
 function titleCase(s) {
   return String(s || '').toLowerCase().split(/\s+/).filter(Boolean).map((w, i) => (i > 0 && SMALL.has(w) ? w : w.replace(/(^|[-/(])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()))).join(' ')
-    .replace(/\b(Ag|Kg|Og|Gmbh|Ug|Eu|Öbb|Oebb|Dm|Bp|Omv|Kfz|Ams|Svs|Orf|Gis|Atu)\b/g, (w) => ({ Gmbh: 'GmbH', Oebb: 'ÖBB', Dm: 'dm' }[w] || w.toUpperCase()));
+    .replace(/\b(Ag|Ab|Se|Bv|Nv|Kg|Og|Gmbh|Ug|Eu|Öbb|Oebb|Dm|Bp|Omv|Kfz|Ams|Svs|Orf|Gis|Atu)\b/g, (w) => ({ Gmbh: 'GmbH', Oebb: 'ÖBB', Dm: 'dm' }[w] || w.toUpperCase()));
 }
 // Kartenzahlung aus dem Buchungstext lesen: Uhrzeit, Geschäft, Ort
 // ELBA-Text hat Felder wie "Verwendungszweck: … Zahlungsreferenz: … Kartenfolge-Nr.: 1"
 const LABELS = [
   ['ibanEmpf', 'IBAN Zahlungsempf(?:ä|ae|a)nger'], ['bicEmpf', 'BIC Zahlungsempf(?:ä|ae|a)nger'], ['ibanAuf', 'IBAN Auftraggeber'], ['bicAuf', 'BIC Auftraggeber'],
-  ['empf', 'Zahlungsempf(?:ä|ae|a)nger'], ['pflicht', 'Zahlungspflichtiger'], ['auf', 'Auftraggeber'], ['empf2', 'Empf(?:ä|ae|a)nger'],
+  ['ibanEmpf2', 'IBAN Empf(?:ä|ae|a)nger'], ['bicEmpf2', 'BIC Empf(?:ä|ae|a)nger'], ['empf', 'Zahlungsempf(?:ä|ae|a)nger'], ['pflicht', 'Zahlungspflichtiger'], ['auf', 'Auftraggeber'], ['empf2', 'Empf(?:ä|ae|a)nger'],
   ['vz', 'Verwendungszweck'], ['ref', 'Zahlungsreferenz'], ['kfn', 'Kartenfolge-?Nr\\.?'], ['mandat', 'Mandat(?:sreferenz)?'], ['cred', 'Creditor[- ]?ID'],
   ['btext', 'Buchungstext'], ['aufref', 'Auftraggeberreferenz'], ['kenn', 'Empf(?:ä|ae|a)nger-?Kennung'],
 ];
@@ -124,7 +125,7 @@ function fields(t) {
   while ((m = LABEL_RE.exec(t))) { const key = (LABELS.find((l) => new RegExp(`^${l[1]}$`, 'iu').test(m[1])) || [m[1]])[0]; hits.push({ key, i: m.index, end: LABEL_RE.lastIndex }); }
   if (!hits.length) return null;
   const out = { _pre: t.slice(0, hits[0].i).trim() };
-  hits.forEach((h, n) => { out[h.key] = t.slice(h.end, n + 1 < hits.length ? hits[n + 1].i : t.length).trim(); });
+  hits.forEach((h, n) => { if (!(h.key in out)) out[h.key] = t.slice(h.end, n + 1 < hits.length ? hits[n + 1].i : t.length).trim(); });
   return out;
 }
 const RE_WHEN = /(\d{2})\.(\d{2})\.?(?:\d{2,4})?\s+(\d{1,2})[:.](\d{2})(?:[:.]\d{2})?/;
@@ -153,6 +154,7 @@ function parseShop(src) {
       name = core.slice(0, k); place = core.slice(k);
     } else { name = core; place = []; }
   }
+  while (name.length > 1 && /^\d+$/.test(name[0])) name.shift(); // Filialnummer vorne weg
   return { merchant: titleCase(name.join(' ')).slice(0, 40) || 'Unbekannt', place: titleCase(place.join(' ')).slice(0, 40), via: via && via !== 'POS' ? titleCase(via) : null };
 }
 function parseText(raw) {
@@ -160,7 +162,7 @@ function parseText(raw) {
   const flat = t.replace(/\s+/g, ' ');
   const f = fields(t);
   let time = null; let day = null;
-  const findWhen = (x) => { const m = String(x || '').replace(/\s+/g, ' ').match(RE_WHEN); if (m && !time) { time = `${pad(m[3])}:${m[4]}`; day = { d: +m[1], m: +m[2] }; } return m; };
+  const findWhen = (x) => { const m = String(x || '').replace(/\s+/g, ' ').match(RE_WHEN) || String(x || '').replace(/\s+/g, ' ').match(/(\d{2})\.(\d{2})\.?\s+UM\s+(\d{1,2})[:.](\d{2})/i); if (m && !time) { time = `${pad(m[3])}:${m[4]}`; day = { d: +m[1], m: +m[2] }; } return m; };
   if (f) {
     const ref = f.ref || ''; const vz = f.vz || '';
     findWhen(ref); findWhen(vz); findWhen(f._pre);
@@ -300,7 +302,7 @@ function buildTx(row) {
   return applyParse({ id, amount: r2(Math.abs(row.amount)), dir: row.amount > 0 ? 'in' : 'out', src: 'elba', alloc: [], created: Date.now() }, row.raw, row.date, row.ts);
 }
 // Nach einem Update: bereits eingelesene Ausgaben neu erkennen (Zuordnungen bleiben)
-const PARSER = 3;
+const PARSER = 4;
 function migrate() {
   if ((db.parser || 1) >= PARSER) return;
   const junk = /kartenfolge|verwendungszweck|zahlungsreferenz|^unbekannt$/;
@@ -308,6 +310,12 @@ function migrate() {
   Object.keys(db.rules).forEach((k) => { if (junk.test(k)) delete db.rules[k]; });
   Object.keys(db.lookups).forEach((k) => { if (junk.test(k) || !db.lookups[k].custom) delete db.lookups[k]; }); // neu suchen, nur noch in Österreich
   db.parser = PARSER; save();
+}
+// Einmalig: alte, von Hand gesetzte Haken entfernen (jetzt rechnet die App selbst)
+function resetTicksOnce() {
+  if (db.ticksReset) return;
+  Object.values(db.tx).forEach((t) => (t.alloc || []).forEach((a) => { a.paid = false; }));
+  db.ticksReset = true; save();
 }
 
 let pendingImport = null;
@@ -474,17 +482,50 @@ function shift(dir) {
   if (period.mode === 'year') period.y = String(+period.y + dir);
   if (period.mode === 'month') { const d = parseDay(`${period.ym}-01`); d.setMonth(d.getMonth() + dir); period.ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
 }
+// Rückzahlungen mit Ausgaben verrechnen:
+// 1) gleicher Betrag -> diese Ausgabe, 2) sonst Ausgaben im selben Monat, 3) dann die ältesten, Rest = Guthaben.
+// Von Hand abgehakte Ausgaben gelten als erledigt und brauchen keine Zahlung.
+function settle(pid) {
+  if (settleCache[pid]) return settleCache[pid];
+  const items = [];
+  Object.values(db.tx).forEach((t) => { if (t.ignored) return; (t.alloc || []).forEach((a, i) => { if (a.p === pid) items.push({ key: `${t.id}|${i}`, t, a, i, date: t.date, amt: a.amt, left: a.paid ? 0 : a.amt, manual: !!a.paid, by: [] }); }); });
+  items.sort((x, y) => (x.date + (x.t.time || '')).localeCompare(y.date + (y.t.time || '')));
+  const pays = db.payments.filter((x) => x.p === pid).map((x) => ({ ...x, left: x.amt })).sort((x, y) => x.date.localeCompare(y.date));
+  const take = (it, py, amt) => { it.left = r2(it.left - amt); py.left = r2(py.left - amt); it.by.push({ date: py.date, amt: r2(amt), note: py.note }); };
+  pays.forEach((py) => { // 1) gleicher Betrag
+    const cands = items.filter((it) => it.left > 0 && it.left === it.amt && Math.abs(it.amt - py.amt) < 0.005);
+    if (!cands.length) return;
+    const before = cands.filter((it) => it.date <= py.date);
+    const it = before.length ? before[before.length - 1] : cands[0];
+    take(it, py, py.left);
+  });
+  pays.forEach((py) => { // 2) selber Monat, 3) älteste zuerst
+    if (py.left <= 0) return;
+    const m = py.date.slice(0, 7);
+    const order = [...items.filter((it) => it.date.startsWith(m)), ...items.filter((it) => !it.date.startsWith(m))];
+    for (const it of order) { if (py.left <= 0) break; if (it.left > 0) take(it, py, Math.min(it.left, py.left)); }
+  });
+  const map = {}; items.forEach((it) => { it.state = it.manual ? 'manual' : it.left <= 0 ? 'paid' : it.left < it.amt ? 'part' : 'open'; map[it.key] = it; });
+  const res = { map, items, open: r2(items.reduce((x, it) => x + it.left, 0)), credit: r2(pays.reduce((x, py) => x + Math.max(0, py.left), 0)), got: r2(pays.reduce((x, py) => x + py.amt, 0)), manual: r2(items.filter((it) => it.manual).reduce((x, it) => x + it.amt, 0)) };
+  settleCache[pid] = res;
+  return res;
+}
+const stateOf = (t, i, a) => (settle(a.p).map[`${t.id}|${i}`] || { state: 'open', left: a.amt, by: [] });
+function stateText(st, isMe) {
+  if (isMe) return 'eigene Ausgabe';
+  if (st.state === 'manual') return 'von Hand abgehakt';
+  if (st.state === 'paid') return `bezahlt ${st.by.map((b) => fmtDay(b.date, { day: '2-digit', month: '2-digit' })).filter((v, k, arr) => arr.indexOf(v) === k).join(', ')}`;
+  if (st.state === 'part') return `teilweise bezahlt · noch ${money(st.left)} offen`;
+  return 'noch offen';
+}
+const checkHtml = (st, attr) => `<button class="check ${st.state === 'paid' ? 'on' : st.state === 'manual' ? 'on manual' : st.state === 'part' ? 'part' : ''}" ${attr} aria-label="von Hand abhaken">${st.state === 'paid' || st.state === 'manual' ? '✓' : st.state === 'part' ? '◐' : ''}</button>`;
 function personStats(pid, onlyPeriod = true) {
-  let spent = 0; let unpaid = 0; let paidItems = 0; const items = [];
-  Object.values(db.tx).forEach((t) => (t.alloc || []).forEach((a, i) => {
-    if (a.p !== pid) return;
-    if (!a.paid) unpaid += a.amt; else paidItems += a.amt;
-    if (!onlyPeriod || inPeriod(t.date)) { spent += a.amt; items.push({ t, a, i }); }
-  }));
-  const payments = db.payments.filter((p) => p.p === pid);
-  const got = payments.reduce((s, p) => s + p.amt, 0);
+  const se = settle(pid);
+  let spent = 0; const items = [];
+  se.items.forEach((it) => { if (!onlyPeriod || inPeriod(it.date)) { spent += it.amt; items.push({ t: it.t, a: it.a, i: it.i, st: it }); } });
   const isMe = person(pid) && person(pid).me;
-  return { spent: r2(spent), open: isMe ? 0 : r2(Math.max(0, unpaid - got)), credit: isMe ? 0 : r2(Math.max(0, got - unpaid)), paid: r2(paidItems + got), items: items.sort((x, y) => (y.t.date + (y.t.time || '')).localeCompare(x.t.date + (x.t.time || ''))), payments };
+  return { spent: r2(spent), open: isMe ? 0 : se.open, credit: isMe ? 0 : se.credit, paid: isMe ? 0 : se.got, manual: se.manual,
+    items: items.sort((x, y) => (y.t.date + (y.t.time || '')).localeCompare(x.t.date + (x.t.time || ''))), payments: db.payments.filter((x) => x.p === pid) };
 }
 
 // ---------- Ansichten ----------
@@ -513,7 +554,7 @@ function txCard(t, mode) {
       <button class="chip ghost" data-split="${esc(t.id)}">✂️ Aufteilen</button>
       <button class="chip ghost" data-as="${esc(t.id)}|ignore">Ignorieren</button></div>`
     : isIn(t) ? (t.payFrom ? `<div class="alloc"><span class="tag" style="color:var(--ok)">↩ Rückzahlung von ${esc(pname(t.payFrom))}</span></div>` : t.ignored ? '<div class="alloc"><span class="tag">ignoriert</span></div>' : '')
-    : (t.alloc && t.alloc.length ? `<div class="alloc">${t.alloc.map((a) => `<span class="tag ${a.paid ? 'paid' : ''}"><span class="pdot" style="width:8px;height:8px;border-radius:50%;background:${pcolor(a.p)}"></span>${esc(pname(a.p))}${t.alloc.length > 1 ? ` ${money(a.amt)}` : ''}</span>`).join('')}</div>` : t.ignored ? '<div class="alloc"><span class="tag">ignoriert</span></div>' : '<div class="alloc"><span class="tag" style="color:var(--bad)">nicht zugeordnet</span></div>');
+    : (t.alloc && t.alloc.length ? `<div class="alloc">${t.alloc.map((a, k) => `<span class="tag ${['paid', 'manual'].includes(stateOf(t, k, a).state) && !(person(a.p) || {}).me ? 'paid' : ''}"><span class="pdot" style="width:8px;height:8px;border-radius:50%;background:${pcolor(a.p)}"></span>${esc(pname(a.p))}${t.alloc.length > 1 ? ` ${money(a.amt)}` : ''}</span>`).join('')}</div>` : t.ignored ? '<div class="alloc"><span class="tag">ignoriert</span></div>' : '<div class="alloc"><span class="tag" style="color:var(--bad)">nicht zugeordnet</span></div>');
   return `<div class="tx ${sel && selected.has(t.id) ? 'picked' : ''}">
     <button class="tx-head" ${sel ? `data-pick="${esc(t.id)}"` : `data-open="${esc(t.id)}"`}>
       ${sel ? `<span class="check ${selected.has(t.id) ? 'on' : ''}" style="margin:6px 6px 0 0">${selected.has(t.id) ? '✓' : ''}</span>` : `<span class="tx-ico" title="${esc(i.catLabel)}">${i.icon}</span>`}
@@ -721,7 +762,7 @@ function viewTx(id) {
           ${t.raw ? `<div class="section-title" style="margin-top:12px">Text von der Bank</div><div class="raw">${esc(t.raw)}</div>` : ''}</div>
         <div class="row"><a class="btn" href="${esc(googleUrl(t))}" target="_blank" rel="noopener">🔎 Im Internet suchen</a><button class="btn" id="tName">✏️ Name / Art ändern</button></div>
         <div class="section-title">Für wen</div>
-        ${(t.alloc || []).length ? `<div class="list">${t.alloc.map((a, k) => `<div class="line-item"><button class="check ${a.paid ? 'on' : ''}" data-paid="${k}" aria-label="bezahlt">${a.paid ? '✓' : ''}</button><span class="info"><b>${esc(pname(a.p))}</b><small>${person(a.p) && person(a.p).me ? 'eigene Ausgabe' : a.paid ? 'zurückbezahlt' : 'noch offen'}</small></span><b class="num">${money(a.amt)}</b></div>`).join('')}</div>` : `<div class="${t.ignored ? 'note-box' : 'warn-box'}">${t.ignored ? 'Diese Ausgabe wird ignoriert (zählt nirgends mit).' : 'Noch niemandem zugeordnet.'}</div>`}
+        ${(t.alloc || []).length ? `<div class="list">${t.alloc.map((a, k) => { const st = stateOf(t, k, a); const me = person(a.p) && person(a.p).me; return `<div class="line-item">${me ? '<span class="check"></span>' : checkHtml(st, `data-paid="${k}"`)}<span class="info"><b>${esc(pname(a.p))}</b><small>${esc(stateText(st, me))}</small></span><b class="num">${money(a.amt)}</b></div>`; }).join('')}</div>` : `<div class="${t.ignored ? 'note-box' : 'warn-box'}">${t.ignored ? 'Diese Ausgabe wird ignoriert (zählt nirgends mit).' : 'Noch niemandem zugeordnet.'}</div>`}
         <div class="chips">${db.persons.map((p) => `<button class="chip" data-to="${esc(p.id)}"><span class="pdot" style="background:${p.color}"></span>${esc(p.name)}</button>`).join('')}${db.groups.map((g) => `<button class="chip" data-to="g:${esc(g.id)}">👥 ${esc(g.name)}</button>`).join('')}<button class="chip ghost" id="tSplit">✂️ Aufteilen</button></div>
         <label class="field" style="margin-top:14px"><span>Notiz</span><input class="input" id="tNote" value="${esc(t.note || '')}" placeholder="z. B. Geburtstagsgeschenk, Hälfte vom Tanken"></label>
         ${t.src !== 'elba' ? '<button class="btn" id="tEdit">✏️ Betrag / Datum bearbeiten</button>' : ''}
@@ -729,7 +770,7 @@ function viewTx(id) {
         <button class="btn danger" id="tDel">🗑️ Löschen</button>`,
       mount(b) {
         $$('[data-to]', b).forEach((x) => (x.onclick = () => { assign(t, x.dataset.to); toast('Gespeichert'); showView(viewTx(id)); }));
-        $$('[data-paid]', b).forEach((x) => (x.onclick = () => { const a = t.alloc[+x.dataset.paid]; a.paid = !a.paid; save(); showView(viewTx(id)); }));
+        $$('[data-paid]', b).forEach((x) => (x.onclick = () => { const a = t.alloc[+x.dataset.paid]; a.paid = !a.paid; save(); toast(a.paid ? 'Von Hand abgehakt' : 'Haken entfernt'); showView(viewTx(id)); }));
         $('#tSplit', b).onclick = () => pushView(viewSplit(id));
         $('#tName', b).onclick = () => pushView(viewRename(id));
         $('#tNote', b).onchange = (e) => { t.note = e.target.value.trim(); save(); };
@@ -851,14 +892,15 @@ function viewPerson(pid) {
       html: `<div class="hint" style="margin-top:0">${esc(periodLabel())}</div>
         <div class="stats"><div class="stat"><b class="num">${money(s.spent)}</b><small>ausgegeben</small></div>
           ${p.me ? `<div class="stat"><b class="num">${s.items.length}</b><small>Ausgaben</small></div><div class="stat"><b class="num">${s.items.length ? money(s.spent / s.items.length) : '–'}</b><small>Ø</small></div>`
-          : `<div class="stat ok"><b class="num">${money(s.paid)}</b><small>zurückbezahlt</small></div><div class="stat ${s.open ? 'bad' : 'ok'}"><b class="num">${money(s.open)}</b><small>noch offen</small></div>`}</div>
+          : `<div class="stat ok"><b class="num">${money(s.paid)}</b><small>zurückbezahlt</small></div>${s.credit && !s.open ? `<div class="stat ok"><b class="num">${money(s.credit)}</b><small>Guthaben</small></div>` : `<div class="stat ${s.open ? 'bad' : 'ok'}"><b class="num">${money(s.open)}</b><small>noch offen</small></div>`}`}</div>
+        ${p.me ? '' : `<p class="hint" style="margin-top:-4px">Zurückbezahlt und offen zählen immer über alle Monate.${s.manual ? ` ${money(s.manual)} sind von Hand abgehakt.` : ''}${s.credit && s.open ? ` Guthaben: ${money(s.credit)}.` : ''} Tipp auf den Kreis, um etwas von Hand abzuhaken (z. B. bar bezahlt oder geschenkt).</p>`}
         ${p.me ? '' : `<div class="row"><button class="btn primary" id="pPay">💶 Zahlung erhalten</button><button class="btn" id="pShare">📤 Liste schicken</button></div>
           <button class="btn" id="pBulk">☑️ Mehrere umbuchen (falsch zugeordnet?)</button>
-          ${s.items.some((x) => !x.a.paid) ? '<button class="btn" id="pAll">✓ Alle in diesem Zeitraum als bezahlt abhaken</button>' : ''}`}
+`}
         <div class="section-title"><span>Ausgaben</span><span>${s.items.length}</span></div>
-        ${s.items.length ? `<div class="list">${s.items.map(({ t, a, i }) => { const inf = info(t); return `<div class="line-item">
-            ${p.me ? `<span class="tx-ico" style="width:32px;height:32px;font-size:16px">${inf.icon}</span>` : `<button class="check ${a.paid ? 'on' : ''}" data-pp="${esc(t.id)}|${i}" aria-label="bezahlt">${a.paid ? '✓' : ''}</button>`}
-            <button class="info" data-open2="${esc(t.id)}"><b>${esc(inf.name)}</b><small>${esc([inf.place, `${fmtDay(t.date)}${t.time ? ` ${t.time}` : ''}`, t.alloc.length > 1 ? `Anteil von ${money(t.amount)}` : '', t.note].filter(Boolean).join(' · '))}</small></button>
+        ${s.items.length ? `<div class="list">${s.items.map(({ t, a, i, st }) => { const inf = info(t); return `<div class="line-item">
+            ${p.me ? `<span class="tx-ico" style="width:32px;height:32px;font-size:16px">${inf.icon}</span>` : checkHtml(st, `data-pp="${esc(t.id)}|${i}"`)}
+            <button class="info" data-open2="${esc(t.id)}"><b>${esc(inf.name)}</b><small>${esc([inf.place, `${fmtDay(t.date)}${t.time ? ` ${t.time}` : ''}`, t.alloc.length > 1 ? `Anteil von ${money(t.amount)}` : '', t.note].filter(Boolean).join(' · '))}${p.me ? '' : `<br><span class="st-${st.state}">${esc(stateText(st, false))}</span>`}</small></button>
             <b class="num">${money(a.amt)}</b></div>`; }).join('')}</div>` : '<div class="empty">Keine Ausgaben in diesem Zeitraum.</div>'}
         ${s.payments.length && !p.me ? `<div class="section-title">Schon gezahlt (Zahlungen)</div><div class="list">${s.payments.slice().sort((x, y) => y.date.localeCompare(x.date)).map((x) => `<div class="line-item"><span class="info"><b>${money(x.amt)}</b><small>${esc([fmtDay(x.date, { day: '2-digit', month: '2-digit', year: 'numeric' }), x.note].filter(Boolean).join(' · '))}</small></span>${x.txId ? '<small class="muted">aus Kontoeingang</small>' : `<button class="icon-btn" data-pdel="${esc(x.id)}" aria-label="Zahlung löschen">🗑️</button>`}</div>`).join('')}</div>` : ''}
         <button class="btn" id="pCsv">📊 Als Excel-Tabelle</button>`,
@@ -867,7 +909,6 @@ function viewPerson(pid) {
         $$('[data-open2]', b).forEach((x) => (x.onclick = () => pushView(viewTx(x.dataset.open2))));
         $$('[data-pdel]', b).forEach((x) => (x.onclick = () => { if (!confirm('Diese Zahlung löschen?')) return; db.payments = db.payments.filter((y) => y.id !== x.dataset.pdel); save(); showView(viewPerson(pid)); }));
         const pay = $('#pPay', b); if (pay) pay.onclick = () => pushView(viewPayment(pid));
-        const all = $('#pAll', b); if (all) all.onclick = () => { if (!confirm(`Alle ${s.items.filter((x) => !x.a.paid).length} offenen Ausgaben von ${p.name} (${periodLabel()}) als bezahlt abhaken?`)) return; s.items.forEach(({ a }) => { a.paid = true; }); save(); showView(viewPerson(pid)); };
         const sh = $('#pShare', b); if (sh) sh.onclick = () => shareList(pid);
         const bu = $('#pBulk', b); if (bu) bu.onclick = () => { closeSheet(); tab = 'all'; filterP = pid; selMode = true; selected.clear(); render(); window.scrollTo(0, 0); };
         $('#pCsv', b).onclick = () => exportCsv(pid);
@@ -878,24 +919,16 @@ function viewPerson(pid) {
 function viewPayment(pid) {
   return () => ({
     title: `Zahlung von ${pname(pid)}`,
-    html: `<p class="hint" style="margin-top:0">Noch offen: <b>${money(personStats(pid).open)}</b>. Eine Zahlung wird vom offenen Betrag abgezogen.</p>
+    html: `<p class="hint" style="margin-top:0">Noch offen: <b>${money(personStats(pid).open)}</b>. Die Zahlung wird automatisch verrechnet: zuerst mit einer Ausgabe mit gleichem Betrag, sonst mit dem selben Monat, dann mit den ältesten. Was übrig bleibt, wird Guthaben.</p>
       <div class="grid2"><label class="field"><span>Betrag (€)</span><input class="input num" id="pyAmt" inputmode="decimal" value="${fmtIn(personStats(pid).open) || ''}"></label>
       <label class="field"><span>Datum</span><input class="input" id="pyDate" type="date" value="${today()}"></label></div>
       <label class="field"><span>Notiz</span><input class="input" id="pyNote" placeholder="z. B. bar, überwiesen"></label>
-      <label class="check-line"><input type="checkbox" id="pyTick"> Wenn alles bezahlt ist: alle offenen Ausgaben abhaken</label>
       <button class="btn primary" id="pySave">Speichern</button>`,
     mount(b) {
       $('#pySave', b).onclick = () => {
         const amt = num($('#pyAmt', b).value);
         if (!amt || amt <= 0) { toast('Bitte einen Betrag eingeben'); return; }
-        const st = personStats(pid, false);
-        if ($('#pyTick', b).checked && amt >= st.open - 0.005) {
-          Object.values(db.tx).forEach((t) => (t.alloc || []).forEach((a) => { if (a.p === pid) a.paid = true; }));
-          const rest = r2(amt - st.open);
-          db.payments.filter((x) => x.p === pid && x.txId && db.tx[x.txId]).forEach((x) => { db.tx[x.txId].payFrom = null; });
-          db.payments = db.payments.filter((x) => x.p !== pid);
-          if (rest > 0.005) db.payments.push({ id: uid(), p: pid, amt: rest, date: $('#pyDate', b).value || today(), note: 'Überzahlung / Guthaben' });
-        } else db.payments.push({ id: uid(), p: pid, amt: r2(amt), date: $('#pyDate', b).value || today(), note: $('#pyNote', b).value.trim() });
+        db.payments.push({ id: uid(), p: pid, amt: r2(amt), date: $('#pyDate', b).value || today(), note: $('#pyNote', b).value.trim() || 'bar / von Hand' });
         save(); toast('Zahlung eingetragen'); backView();
       };
     },
@@ -917,14 +950,14 @@ function exportCsv(pid) {
     const i = info(t);
     if (isIn(t)) { if (!only) rows.push([fmtDay(t.date, { day: '2-digit', month: '2-digit', year: 'numeric' }), t.time || '', i.name, '', 'Einnahme', dec(t.amount), t.payFrom ? `Rückzahlung von ${pname(t.payFrom)}` : '', dec(t.amount), '', t.note || '', t.raw || '']); return; }
     const al = (t.alloc || []).length ? t.alloc : [{ p: null, amt: t.amount }];
-    al.filter((a) => !only || a.p === only).forEach((a) => rows.push([fmtDay(t.date, { day: '2-digit', month: '2-digit', year: 'numeric' }), t.time || '', i.name, i.place, i.catLabel, dec(t.amount), a.p ? pname(a.p) : 'nicht zugeordnet', dec(a.amt), a.paid ? 'ja' : 'nein', t.note || '', t.raw || '']));
+    al.filter((a) => !only || a.p === only).forEach((a, k) => rows.push([fmtDay(t.date, { day: '2-digit', month: '2-digit', year: 'numeric' }), t.time || '', i.name, i.place, i.catLabel, dec(t.amount), a.p ? pname(a.p) : 'nicht zugeordnet', dec(a.amt), a.p ? ({ paid: 'ja', manual: 'ja (von Hand)', part: `teilweise, offen ${dec(stateOf(t, k, a).left)}`, open: 'nein' }[stateOf(t, k, a).state]) : '', t.note || '', t.raw || '']));
   });
   saveFile(`ausgaben-${only ? pname(only).toLowerCase() : 'alle'}-${period.mode === 'month' ? period.ym : period.mode === 'year' ? period.y : 'gesamt'}.csv`, 'text/csv', csvText(rows));
 }
 async function shareList(pid) {
   const s = personStats(pid);
-  const open = s.items.filter((x) => !x.a.paid);
-  const lines = open.map(({ t, a }) => { const i = info(t); return `• ${fmtDay(t.date, { day: '2-digit', month: '2-digit' })}${t.time ? ` ${t.time}` : ''} ${i.name}${i.place ? `, ${i.place}` : ''}: ${money(a.amt)}`; });
+  const open = s.items.filter((x) => x.st.left > 0);
+  const lines = open.map(({ t, st }) => { const i = info(t); return `• ${fmtDay(t.date, { day: '2-digit', month: '2-digit' })}${t.time ? ` ${t.time}` : ''} ${i.name}${i.place ? `, ${i.place}` : ''}: ${money(st.left)}${st.state === 'part' ? ` (Rest von ${money(st.amt)})` : ''}`; });
   const text = `Hallo ${pname(pid)}, hier meine Auslagen für dich (${periodLabel()}):\n\n${lines.join('\n') || '(nichts offen)'}\n\nNoch offen gesamt: ${money(s.open)}`;
   try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e.name === 'AbortError') return; }
   try { await navigator.clipboard.writeText(text); toast('Text kopiert – jetzt z. B. in WhatsApp einfügen'); } catch (e) { toast('Teilen geht hier nicht'); }
@@ -1026,6 +1059,7 @@ $('#fileCsv').onchange = (e) => { const f = e.target.files[0]; e.target.value = 
 $('#fileBackup').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importBackup(f); };
 window.addEventListener('online', lookupQueue);
 migrate();
+resetTicksOnce();
 render();
 lookupQueue();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
