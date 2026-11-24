@@ -2,7 +2,7 @@
    Alle Daten bleiben nur auf diesem Gerät (localStorage). */
 (() => {
 'use strict';
-const VERSION = '1.2';
+const VERSION = '1.3';
 const KEY = 'ausgaben_v1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -430,6 +430,7 @@ const googleUrl = (tx) => `https://www.google.com/search?q=${encodeURIComponent(
 
 // ---------- Zuordnen ----------
 function assign(tx, target, remember = true) {
+  if (isIn(tx)) { if (target === 'ignore') { decideIn(tx, '', false); tx.ignored = true; save(); } return; }
   if (target === 'ignore') { tx.ignored = true; tx.alloc = []; }
   else if (target.startsWith('g:')) { const g = db.groups.find((x) => x.id === target.slice(2)); if (!g) return; tx.alloc = evenSplit(tx.amount, g.members.filter(person)); tx.ignored = false; }
   else { tx.alloc = [{ p: target, amt: tx.amount, paid: false }]; tx.ignored = false; }
@@ -442,6 +443,11 @@ function applySplit(tx, parts, remember) {
   save();
 }
 function suggestion(tx) {
+  if (isIn(tx)) {
+    const ri = tx.mkey ? db.rules[`in:${tx.mkey}`] : null;
+    if (!ri) return null;
+    return ri === 'normal' ? { label: 'Normale Einnahme', inTarget: '' } : person(ri) ? { label: `Rückzahlung von ${pname(ri)}`, inTarget: ri } : null;
+  }
   const r = tx.mkey ? db.rules[tx.mkey] : null;
   if (!r) return null;
   if (typeof r === 'string') return r === 'ignore' ? { label: 'Ignorieren', target: 'ignore' } : r.startsWith('g:') ? { label: (db.groups.find((g) => g.id === r.slice(2)) || {}).name, target: r } : person(r) ? { label: pname(r), target: r } : null;
@@ -450,13 +456,15 @@ function suggestion(tx) {
 }
 function applySuggestion(tx) {
   const s = suggestion(tx); if (!s) return;
+  if (s.inTarget !== undefined) { decideIn(tx, s.inTarget, false); return; }
   if (s.split) {
     const parts = s.split.map(([p, f]) => ({ p, amt: r2(tx.amount * f) }));
     const diff = r2(tx.amount - parts.reduce((x, y) => x + y.amt, 0)); if (parts.length) parts[parts.length - 1].amt = r2(parts[parts.length - 1].amt + diff);
     applySplit(tx, parts, false);
   } else assign(tx, s.target, false);
 }
-const unassigned = () => Object.values(db.tx).filter((t) => !isIn(t) && !t.ignored && !(t.alloc && t.alloc.length)).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
+const openIn = (t) => isIn(t) && !t.ignored && !t.payFrom && !t.inDone;
+const unassigned = () => Object.values(db.tx).filter((t) => (isIn(t) ? openIn(t) : !t.ignored && !(t.alloc && t.alloc.length))).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
 
 // ---------- Rechnen ----------
 let period = { mode: 'month', ym: today().slice(0, 7), y: today().slice(0, 4) };
@@ -481,6 +489,7 @@ function personStats(pid, onlyPeriod = true) {
 
 // ---------- Ansichten ----------
 let tab = 'todo';
+let selMode = false; const selected = new Set();
 let filterP = 'all';
 let query = '';
 function periodHtml() {
@@ -491,7 +500,13 @@ function txCard(t, mode) {
   const i = info(t);
   const sug = mode === 'todo' ? suggestion(t) : null;
   const meta = [i.place, `${fmtDay(t.date)}${t.time ? ` · ${t.time}` : ''}`, KIND_LABEL[t.kind] || ''].filter(Boolean).join(' · ');
-  const chips = mode === 'todo' ? `<div class="chips">
+  const sel = mode === 'all' && selMode && !isIn(t);
+  const chips = mode === 'todo' && isIn(t) ? `<div class="hint" style="margin:8px 0 0">Wer hat dir das gezahlt?</div><div class="chips" style="margin-top:6px">
+      ${sug ? `<button class="chip sugg" data-sug="${esc(t.id)}">Vorschlag: ${esc(sug.label)} ✓</button>` : ''}
+      ${others().map((p) => `<button class="chip" data-pfq="${esc(t.id)}|${esc(p.id)}"><span class="pdot" style="background:${p.color}"></span>↩ ${esc(p.name)}</button>`).join('')}
+      <button class="chip" data-pfq="${esc(t.id)}|">💰 Normale Einnahme</button>
+      <button class="chip ghost" data-as="${esc(t.id)}|ignore">Ignorieren</button></div>`
+    : mode === 'todo' ? `<div class="chips">
       ${sug ? `<button class="chip sugg" data-sug="${esc(t.id)}">Vorschlag: ${esc(sug.label)} ✓</button>` : ''}
       ${db.persons.map((p) => `<button class="chip" data-as="${esc(t.id)}|${esc(p.id)}"><span class="pdot" style="background:${p.color}"></span>${esc(p.name)}</button>`).join('')}
       ${db.groups.map((g) => `<button class="chip" data-as="${esc(t.id)}|g:${esc(g.id)}">👥 ${esc(g.name)}</button>`).join('')}
@@ -499,9 +514,9 @@ function txCard(t, mode) {
       <button class="chip ghost" data-as="${esc(t.id)}|ignore">Ignorieren</button></div>`
     : isIn(t) ? (t.payFrom ? `<div class="alloc"><span class="tag" style="color:var(--ok)">↩ Rückzahlung von ${esc(pname(t.payFrom))}</span></div>` : t.ignored ? '<div class="alloc"><span class="tag">ignoriert</span></div>' : '')
     : (t.alloc && t.alloc.length ? `<div class="alloc">${t.alloc.map((a) => `<span class="tag ${a.paid ? 'paid' : ''}"><span class="pdot" style="width:8px;height:8px;border-radius:50%;background:${pcolor(a.p)}"></span>${esc(pname(a.p))}${t.alloc.length > 1 ? ` ${money(a.amt)}` : ''}</span>`).join('')}</div>` : t.ignored ? '<div class="alloc"><span class="tag">ignoriert</span></div>' : '<div class="alloc"><span class="tag" style="color:var(--bad)">nicht zugeordnet</span></div>');
-  return `<div class="tx">
-    <button class="tx-head" data-open="${esc(t.id)}">
-      <span class="tx-ico" title="${esc(i.catLabel)}">${i.icon}</span>
+  return `<div class="tx ${sel && selected.has(t.id) ? 'picked' : ''}">
+    <button class="tx-head" ${sel ? `data-pick="${esc(t.id)}"` : `data-open="${esc(t.id)}"`}>
+      ${sel ? `<span class="check ${selected.has(t.id) ? 'on' : ''}" style="margin:6px 6px 0 0">${selected.has(t.id) ? '✓' : ''}</span>` : `<span class="tx-ico" title="${esc(i.catLabel)}">${i.icon}</span>`}
       <span class="tx-main"><span class="tx-name">${esc(i.name)}</span><span class="tx-meta">${esc(meta)}</span>
         ${t.purpose ? `<span class="tx-purpose">${esc(t.purpose)}</span>` : ''}
         ${i.found ? `<span class="found">🔎 ${esc([i.catLabel !== 'Sonstiges' ? i.catLabel : '', i.found.desc || '', `laut ${i.found.src}`].filter(Boolean).join(' · '))}</span>` : ''}</span>
@@ -523,7 +538,7 @@ function todoHtml() {
   const withSug = list.filter((t) => suggestion(t));
   const bk = backupDue();
   return `${bk ? `<div class="warn-box">💾 ${bk} <button class="btn small" data-act="backup" style="margin-top:8px">Jetzt sichern</button></div>` : ''}
-    ${list.length ? `<p class="hint" style="margin-top:0">${list.length} Ausgabe${list.length === 1 ? '' : 'n'} noch zuordnen. Tipp auf eine Person – oder auf den <b>Vorschlag</b>.</p>
+    ${list.length ? `<p class="hint" style="margin-top:0">${(() => { const ni = list.filter(isIn).length; const no = list.length - ni; return [no ? `${no} Ausgabe${no === 1 ? '' : 'n'}` : '', ni ? `${ni} Einnahme${ni === 1 ? '' : 'n'}` : ''].filter(Boolean).join(' und '); })()} noch zuordnen. Tipp auf eine Person – oder auf den <b>Vorschlag</b>.</p>
       ${withSug.length > 1 ? `<button class="btn" data-act="allSug">✓ Alle ${withSug.length} Vorschläge übernehmen</button>` : ''}
       ${list.map((t) => txCard(t, 'todo')).join('')}`
       : `<div class="empty"><span class="big">🎉</span>Alles zugeordnet!<br><button class="btn primary" data-act="import" style="margin-top:14px">⬇️ Neue Umsätze einlesen</button></div>`}
@@ -536,10 +551,10 @@ function peopleHtml() {
   return `${periodHtml()}
     <div class="stats"><div class="stat"><b class="num">${money(total)}</b><small>ausgegeben</small></div>
       <div class="stat ${openAll ? 'bad' : 'ok'}"><b class="num">${money(openAll)}</b><small>noch offen</small></div>
-      <div class="stat"><b class="num">${unassigned().length}</b><small>nicht zugeordnet</small></div></div>
+      <div class="stat"><b class="num">${unassigned().length}</b><small>noch zuordnen</small></div></div>
     <div class="people">${list.map(({ p, s }) => `<button class="pcard" data-person="${esc(p.id)}" style="--pc:${p.color}">
       <b>${esc(p.name)}</b><span class="big num">${money(s.spent)}</span><small>${s.items.length} Ausgabe${s.items.length === 1 ? '' : 'n'}</small>
-      ${p.me ? '<small>deine eigenen Ausgaben</small>' : `<span class="open ${s.open ? '' : 'zero'}">${s.open ? `offen ${money(s.open)}` : s.credit ? `Guthaben ${money(s.credit)}` : 'alles bezahlt ✓'}</span>`}</button>`).join('')}</div>
+      ${!p.me && s.paid ? `<small>schon gezahlt ${money(s.paid)}</small>` : ''}${p.me ? '<small>deine eigenen Ausgaben</small>' : `<span class="open ${s.open ? '' : 'zero'}">${s.open ? `offen ${money(s.open)}` : s.credit ? `Guthaben ${money(s.credit)}` : 'alles bezahlt ✓'}</span>`}</button>`).join('')}</div>
     <p class="hint">„Offen“ zählt über alle Monate – was abgehakt oder als Zahlung eingetragen ist, ist erledigt.</p>`;
 }
 function allHtml() {
@@ -562,10 +577,14 @@ function allHtml() {
   const days = {}; list.forEach((t) => { (days[t.date] = days[t.date] || []).push(t); });
   return `${periodHtml()}
     <div class="chips" style="margin:0 0 10px">${[['all', 'Alle'], ['out', 'Ausgaben'], ['in', 'Einnahmen'], ...db.persons.map((p) => [p.id, p.name]), ['none', 'Nicht zugeordnet'], ['ignored', 'Ignoriert']].map(([k, l]) => `<button class="chip ${filterP === k ? 'on' : ''}" data-fp="${esc(k)}">${esc(l)}</button>`).join('')}</div>
+    ${selMode ? `<div class="row" style="margin-bottom:10px"><button class="btn small" data-act="selAll">Alle ${list.filter((t) => !isIn(t)).length} auswählen</button><button class="btn small" data-act="selNone">Keine</button><button class="btn small primary" data-act="selDone">Fertig</button></div>
+      <p class="hint" style="margin-top:0">Tipp die Ausgaben an, die du umbuchen willst.</p>`
+      : '<button class="btn" data-act="selOn" style="margin-top:0">☑️ Mehrere auswählen & umbuchen</button>'}
     <input class="input" id="q" type="search" placeholder="Suchen … z. B. Lagerhaus, Saalfelden, Tankstelle" value="${esc(query)}">
     <div class="note-box" style="margin-top:10px">${nOut ? `${nOut} Ausgabe${nOut === 1 ? '' : 'n'} · <b>${money(sum)}</b>${byPerson ? ` für ${esc(pname(filterP))}` : ''}` : ''}${nOut && nIn ? '<br>' : ''}${nIn ? `${nIn} Einnahme${nIn === 1 ? '' : 'n'} · <b style="color:var(--ok)">+ ${money(sumIn)}</b>` : ''}${!list.length ? 'Nichts gefunden' : ''}</div>
     ${Object.entries(days).map(([d, ts]) => `<div class="day-head"><span>${esc(fmtDay(d, { weekday: 'long', day: 'numeric', month: 'long' }))}</span><span class="num">${daySum(ts)}</span></div>${ts.map((t) => txCard(t, 'all')).join('')}`).join('') || '<div class="empty">Keine Einträge in diesem Zeitraum.</div>'}
-    ${list.length ? '<button class="btn" data-act="csv">📊 Diese Liste als Excel-Tabelle</button>' : ''}`;
+    ${list.length && !selMode ? '<button class="btn" data-act="csv">📊 Diese Liste als Excel-Tabelle</button>' : ''}
+    ${selMode && selected.size ? `<div class="actionbar"><span><b>${selected.size}</b> ausgewählt<br><small class="num">${money([...selected].reduce((x, id) => x + ((db.tx[id] || {}).amount || 0), 0))}</small></span><button class="btn primary small" data-act="selAssign">Zuordnen an …</button></div>` : ''}`;
 }
 function statsHtml() {
   const every = Object.values(db.tx).filter((t) => inPeriod(t.date) && !t.ignored);
@@ -605,6 +624,13 @@ function bind(v) {
   $$('[data-act="csv"]', v).forEach((b) => (b.onclick = exportCsv));
   $$('[data-act="allSug"]', v).forEach((b) => (b.onclick = () => { const l = unassigned().filter((t) => suggestion(t)); l.forEach(applySuggestion); toast(`${l.length} zugeordnet`); render(true); }));
   $$('[data-sug]', v).forEach((b) => (b.onclick = () => { applySuggestion(db.tx[b.dataset.sug]); toast('Zugeordnet'); render(true); }));
+  $$('[data-pfq]', v).forEach((b) => (b.onclick = () => { const [id, pid] = b.dataset.pfq.split('|'); decideIn(db.tx[id], pid); toast(pid ? `Rückzahlung von ${pname(pid)}` : 'Normale Einnahme'); render(true); }));
+  $$('[data-pick]', v).forEach((b) => (b.onclick = () => { const id = b.dataset.pick; if (selected.has(id)) selected.delete(id); else selected.add(id); render(true); }));
+  $$('[data-act="selOn"]', v).forEach((b) => (b.onclick = () => { selMode = true; selected.clear(); render(true); }));
+  $$('[data-act="selDone"]', v).forEach((b) => (b.onclick = () => { selMode = false; selected.clear(); render(true); }));
+  $$('[data-act="selNone"]', v).forEach((b) => (b.onclick = () => { selected.clear(); render(true); }));
+  $$('[data-act="selAll"]', v).forEach((b) => (b.onclick = () => { $$('[data-pick]', v).forEach((x) => selected.add(x.dataset.pick)); render(true); }));
+  $$('[data-act="selAssign"]', v).forEach((b) => (b.onclick = () => openSheet(viewBulk)));
   $$('[data-as]', v).forEach((b) => (b.onclick = () => { const [id, target] = b.dataset.as.split('|'); assign(db.tx[id], target); toast(target === 'ignore' ? 'Ignoriert' : `→ ${target.startsWith('g:') ? (db.groups.find((g) => g.id === target.slice(2)) || {}).name : pname(target)}`); render(true); }));
   $$('[data-split]', v).forEach((b) => (b.onclick = () => openSheet(viewSplit(b.dataset.split))));
   $$('[data-open]', v).forEach((b) => (b.onclick = () => openSheet(viewTx(b.dataset.open))));
@@ -629,13 +655,14 @@ function backView() { if (stack.length) showView(stack.pop()); else closeSheet()
 function closeSheet() { stack = []; current = null; $('#sheet').hidden = true; $('#overlay').hidden = true; document.body.style.overflow = ''; render(true); }
 
 // Einnahme: anzeigen und optional als Rückzahlung einer Person werten
-function setPayFrom(t, pid) {
+function decideIn(t, pid, remember = true) {
   db.payments = db.payments.filter((x) => x.txId !== t.id);
-  t.payFrom = pid || null;
-  if (pid) db.payments.push({ id: `tx-${t.id}`, txId: t.id, p: pid, amt: t.amount, date: t.date, note: `Eingang: ${info(t).name}` });
-  if (pid && t.mkey) db.rules[`in:${t.mkey}`] = pid;
+  t.payFrom = pid || null; t.inDone = true;
+  if (pid) db.payments.push({ id: `tx-${t.id}`, txId: t.id, p: pid, amt: t.amount, date: t.date, note: `Überweisung: ${info(t).name}` });
+  if (remember && t.mkey) db.rules[`in:${t.mkey}`] = pid || 'normal';
   save();
 }
+function reopenIn(t) { db.payments = db.payments.filter((x) => x.txId !== t.id); t.payFrom = null; t.inDone = false; t.ignored = false; save(); }
 function incomeView(t) {
   const i = info(t);
   const rows = [['Von', i.name], t.purpose ? ['Verwendungszweck', t.purpose] : null, ['Wann', `${fmtDay(t.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${t.time ? `, ${t.time} Uhr` : ''}`], ['Betrag', `+ ${money(t.amount)}`]].filter(Boolean);
@@ -647,13 +674,35 @@ function incomeView(t) {
       <div class="section-title">Ist das eine Rückzahlung?</div>
       <p class="hint" style="margin-top:0">Wenn dir jemand Geld zurücküberwiesen hat, tipp auf die Person – dann wird es bei ihr vom offenen Betrag abgezogen.</p>
       <div class="chips">${others().map((p) => `<button class="chip ${t.payFrom === p.id ? 'on' : ''} ${sugg === p.id ? 'sugg' : ''}" data-pf="${esc(p.id)}"><span class="pdot" style="background:${p.color}"></span>${esc(p.name)}</button>`).join('')}
-        <button class="chip ${t.payFrom ? 'ghost' : 'on'}" data-pf="">Nein, normale Einnahme</button></div>
+        <button class="chip ${t.inDone && !t.payFrom ? 'on' : 'ghost'}" data-pf="">💰 Nein, normale Einnahme</button></div>
       <label class="field" style="margin-top:14px"><span>Notiz</span><input class="input" id="tNote" value="${esc(t.note || '')}"></label>
+      ${t.inDone && !t.ignored ? '<button class="btn" id="tReopen">↺ Wieder zu „Zuordnen“</button>' : ''}
       <button class="btn" id="tIgnore">${t.ignored ? '↩️ Nicht mehr ignorieren' : '🚫 Ignorieren (zählt nirgends mit)'}</button>`,
     mount(b) {
-      $$('[data-pf]', b).forEach((x) => (x.onclick = () => { setPayFrom(t, x.dataset.pf); toast(x.dataset.pf ? `Als Rückzahlung von ${pname(x.dataset.pf)} eingetragen` : 'Gespeichert'); showView(viewTx(t.id)); }));
+      $$('[data-pf]', b).forEach((x) => (x.onclick = () => { decideIn(t, x.dataset.pf); toast(x.dataset.pf ? `Als Rückzahlung von ${pname(x.dataset.pf)} eingetragen` : 'Gespeichert'); showView(viewTx(t.id)); }));
       $('#tNote', b).onchange = (e) => { t.note = e.target.value.trim(); save(); };
-      $('#tIgnore', b).onclick = () => { t.ignored = !t.ignored; if (t.ignored) setPayFrom(t, null); save(); showView(viewTx(t.id)); };
+      $('#tIgnore', b).onclick = () => { if (t.ignored) reopenIn(t); else { decideIn(t, '', false); t.ignored = true; save(); } showView(viewTx(t.id)); };
+      const ro = $('#tReopen', b); if (ro) ro.onclick = () => { reopenIn(t); toast('Wieder bei „Zuordnen“'); showView(viewTx(t.id)); };
+    },
+  };
+}
+// Mehrere Ausgaben auf einmal umbuchen
+function viewBulk() {
+  const ids = [...selected].filter((id) => db.tx[id]);
+  return {
+    title: `${ids.length} Ausgabe${ids.length === 1 ? '' : 'n'} umbuchen`,
+    html: `<p class="hint" style="margin-top:0">Zusammen ${money(ids.reduce((x, id) => x + db.tx[id].amount, 0))}. Wem sollen sie gehören?</p>
+      <div class="chips">${db.persons.map((p) => `<button class="chip" data-bulk="${esc(p.id)}"><span class="pdot" style="background:${p.color}"></span>${esc(p.name)}</button>`).join('')}${db.groups.map((g) => `<button class="chip" data-bulk="g:${esc(g.id)}">👥 ${esc(g.name)}</button>`).join('')}</div>
+      <button class="btn" data-bulk="reset" style="margin-top:16px">↺ Zurück zu „Zuordnen“ (Zuordnung löschen)</button>
+      <button class="btn" data-bulk="ignore">🚫 Ignorieren</button>
+      <p class="hint">Der Haken „bezahlt“ wird dabei zurückgesetzt.</p>`,
+    mount(b) {
+      $$('[data-bulk]', b).forEach((x) => (x.onclick = () => {
+        const target = x.dataset.bulk;
+        ids.forEach((id) => { const t = db.tx[id]; if (target === 'reset') { t.alloc = []; t.ignored = false; } else assign(t, target, false); });
+        save(); selected.clear(); selMode = false; closeSheet();
+        toast(target === 'reset' ? `${ids.length} wieder bei „Zuordnen“` : target === 'ignore' ? `${ids.length} ignoriert` : `${ids.length} → ${target.startsWith('g:') ? (db.groups.find((g) => g.id === target.slice(2)) || {}).name : pname(target)}`);
+      }));
     },
   };
 }
@@ -804,13 +853,14 @@ function viewPerson(pid) {
           ${p.me ? `<div class="stat"><b class="num">${s.items.length}</b><small>Ausgaben</small></div><div class="stat"><b class="num">${s.items.length ? money(s.spent / s.items.length) : '–'}</b><small>Ø</small></div>`
           : `<div class="stat ok"><b class="num">${money(s.paid)}</b><small>zurückbezahlt</small></div><div class="stat ${s.open ? 'bad' : 'ok'}"><b class="num">${money(s.open)}</b><small>noch offen</small></div>`}</div>
         ${p.me ? '' : `<div class="row"><button class="btn primary" id="pPay">💶 Zahlung erhalten</button><button class="btn" id="pShare">📤 Liste schicken</button></div>
+          <button class="btn" id="pBulk">☑️ Mehrere umbuchen (falsch zugeordnet?)</button>
           ${s.items.some((x) => !x.a.paid) ? '<button class="btn" id="pAll">✓ Alle in diesem Zeitraum als bezahlt abhaken</button>' : ''}`}
         <div class="section-title"><span>Ausgaben</span><span>${s.items.length}</span></div>
         ${s.items.length ? `<div class="list">${s.items.map(({ t, a, i }) => { const inf = info(t); return `<div class="line-item">
             ${p.me ? `<span class="tx-ico" style="width:32px;height:32px;font-size:16px">${inf.icon}</span>` : `<button class="check ${a.paid ? 'on' : ''}" data-pp="${esc(t.id)}|${i}" aria-label="bezahlt">${a.paid ? '✓' : ''}</button>`}
             <button class="info" data-open2="${esc(t.id)}"><b>${esc(inf.name)}</b><small>${esc([inf.place, `${fmtDay(t.date)}${t.time ? ` ${t.time}` : ''}`, t.alloc.length > 1 ? `Anteil von ${money(t.amount)}` : '', t.note].filter(Boolean).join(' · '))}</small></button>
             <b class="num">${money(a.amt)}</b></div>`; }).join('')}</div>` : '<div class="empty">Keine Ausgaben in diesem Zeitraum.</div>'}
-        ${s.payments.length && !p.me ? `<div class="section-title">Erhaltene Zahlungen</div><div class="list">${s.payments.slice().sort((x, y) => y.date.localeCompare(x.date)).map((x) => `<div class="line-item"><span class="info"><b>${money(x.amt)}</b><small>${esc([fmtDay(x.date, { day: '2-digit', month: '2-digit', year: 'numeric' }), x.note].filter(Boolean).join(' · '))}</small></span>${x.txId ? '<small class="muted">aus Kontoeingang</small>' : `<button class="icon-btn" data-pdel="${esc(x.id)}" aria-label="Zahlung löschen">🗑️</button>`}</div>`).join('')}</div>` : ''}
+        ${s.payments.length && !p.me ? `<div class="section-title">Schon gezahlt (Zahlungen)</div><div class="list">${s.payments.slice().sort((x, y) => y.date.localeCompare(x.date)).map((x) => `<div class="line-item"><span class="info"><b>${money(x.amt)}</b><small>${esc([fmtDay(x.date, { day: '2-digit', month: '2-digit', year: 'numeric' }), x.note].filter(Boolean).join(' · '))}</small></span>${x.txId ? '<small class="muted">aus Kontoeingang</small>' : `<button class="icon-btn" data-pdel="${esc(x.id)}" aria-label="Zahlung löschen">🗑️</button>`}</div>`).join('')}</div>` : ''}
         <button class="btn" id="pCsv">📊 Als Excel-Tabelle</button>`,
       mount(b) {
         $$('[data-pp]', b).forEach((x) => (x.onclick = () => { const [tid, k] = x.dataset.pp.split('|'); const a = db.tx[tid].alloc[+k]; a.paid = !a.paid; save(); showView(viewPerson(pid)); }));
@@ -819,6 +869,7 @@ function viewPerson(pid) {
         const pay = $('#pPay', b); if (pay) pay.onclick = () => pushView(viewPayment(pid));
         const all = $('#pAll', b); if (all) all.onclick = () => { if (!confirm(`Alle ${s.items.filter((x) => !x.a.paid).length} offenen Ausgaben von ${p.name} (${periodLabel()}) als bezahlt abhaken?`)) return; s.items.forEach(({ a }) => { a.paid = true; }); save(); showView(viewPerson(pid)); };
         const sh = $('#pShare', b); if (sh) sh.onclick = () => shareList(pid);
+        const bu = $('#pBulk', b); if (bu) bu.onclick = () => { closeSheet(); tab = 'all'; filterP = pid; selMode = true; selected.clear(); render(); window.scrollTo(0, 0); };
         $('#pCsv', b).onclick = () => exportCsv(pid);
       },
     };
@@ -963,7 +1014,7 @@ function viewGroup(gid) {
 }
 
 // ---------- Start ----------
-$$('.tab').forEach((b) => (b.onclick = () => { tab = b.dataset.tab; render(); window.scrollTo(0, 0); }));
+$$('.tab').forEach((b) => (b.onclick = () => { if (tab !== b.dataset.tab) { selMode = false; selected.clear(); } tab = b.dataset.tab; render(); window.scrollTo(0, 0); }));
 $('#fab').onclick = () => openSheet(viewManual(null));
 $('#btnImport').onclick = () => $('#fileCsv').click();
 $('#btnSettings').onclick = () => openSheet(viewSettings);
