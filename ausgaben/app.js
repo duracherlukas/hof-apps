@@ -2,7 +2,7 @@
    Alle Daten bleiben nur auf diesem Gerät (localStorage). */
 (() => {
 'use strict';
-const VERSION = '1.0';
+const VERSION = '1.1';
 const KEY = 'ausgaben_v1';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
@@ -42,6 +42,7 @@ const DEFAULT = () => ({
   lastBackup: 0,
 });
 let db = load();
+
 function load() {
   try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.tx) return { ...DEFAULT(), ...d, settings: { ...DEFAULT().settings, ...(d.settings || {}) } }; } catch (e) { /* */ }
   return DEFAULT();
@@ -92,39 +93,101 @@ const BRANDS = [
   [/autohaus|reifen|werkstatt|vergölst|forstinger|atu\b|pit.?stop|waschstra/i, null, 'auto'], [/kino|cineplexx|therme|bergbahn|lift|skipass|eintritt|museum/i, null, 'freizeit'],
   [/thalia|libro|morawa|pagro/i, null, 'sonstiges'], [/\bpost\b/i, 'Österreichische Post', 'sonstiges'], [/trafik|tabak/i, 'Trafik', 'sonstiges'],
 ];
-function brandOf(text) { for (const [re, name, cat] of BRANDS) if (re.test(text)) return { name, cat }; return null; }
+const PREFIX = [['eurospar', 'Eurospar', 'lebensmittel'], ['interspar', 'Interspar', 'lebensmittel'], ['sparkasse', null, null], ['spar', 'Spar', 'lebensmittel'], ['billa', 'Billa', 'lebensmittel'], ['hofer', 'Hofer', 'lebensmittel'],
+  ['lidl', 'Lidl', 'lebensmittel'], ['penny', 'Penny', 'lebensmittel'], ['mpreis', 'MPreis', 'lebensmittel'], ['unimarkt', 'Unimarkt', 'lebensmittel'], ['nahfrisch', 'Nah & Frisch', 'lebensmittel'], ['lagerhaus', 'Lagerhaus', 'landwirtschaft'],
+  ['omv', 'OMV', 'tanken'], ['shell', 'Shell', 'tanken'], ['avanti', 'Avanti', 'tanken'], ['turmoel', 'Turmöl', 'tanken'], ['bipa', 'Bipa', 'drogerie'], ['dmdrogerie', 'dm drogerie markt', 'drogerie'], ['mueller', 'Müller', 'drogerie'],
+  ['mcdonald', "McDonald's", 'essen'], ['burgerking', 'Burger King', 'essen'], ['hornbach', 'Hornbach', 'bau'], ['xxxlutz', 'XXXLutz', 'wohnen'], ['ikea', 'IKEA', 'wohnen'], ['mediamarkt', 'MediaMarkt', 'elektronik'],
+  ['hartlauer', 'Hartlauer', 'elektronik'], ['fressnapf', 'Fressnapf', 'tiere'], ['amazon', 'Amazon', 'online'], ['amzn', 'Amazon', 'online'], ['paypal', 'PayPal', 'online'], ['netflix', 'Netflix', 'abo'], ['spotify', 'Spotify', 'abo'],
+  ['oebb', 'ÖBB', 'verkehr'], ['asfinag', 'Asfinag', 'verkehr'], ['fielmann', 'Fielmann', 'apotheke'], ['deichmann', 'Deichmann', 'kleidung'], ['intersport', 'Intersport', 'freizeit'], ['hervis', 'Hervis', 'freizeit'], ['apotheke', null, 'apotheke']];
+function brandOf(text) {
+  for (const [re, name, cat] of BRANDS) if (re.test(text)) return { name, cat };
+  const flat = String(text || '').toLowerCase().replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/[^a-z0-9]/g, '');
+  for (const [k, name, cat] of PREFIX) if (flat.startsWith(k)) return cat ? { name, cat } : null;
+  return null;
+}
 const SMALL = new Set(['am', 'an', 'im', 'in', 'bei', 'der', 'die', 'das', 'und', 'zum', 'zur', 'von', 'auf', 'a.', 'b.', 'st.']);
 function titleCase(s) {
-  return String(s || '').toLowerCase().split(/\s+/).filter(Boolean).map((w, i) => (i > 0 && SMALL.has(w) ? w : w.replace(/(^|[-/(])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()))).join(' ');
+  return String(s || '').toLowerCase().split(/\s+/).filter(Boolean).map((w, i) => (i > 0 && SMALL.has(w) ? w : w.replace(/(^|[-/(])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()))).join(' ')
+    .replace(/\b(Ag|Kg|Og|Gmbh|Ug|Eu|Öbb|Oebb|Dm|Bp|Omv|Kfz|Ams|Svs|Orf|Gis|Atu)\b/g, (w) => ({ Gmbh: 'GmbH', Oebb: 'ÖBB', Dm: 'dm' }[w] || w.toUpperCase()));
 }
 // Kartenzahlung aus dem Buchungstext lesen: Uhrzeit, Geschäft, Ort
-function parseText(raw) {
-  let t = String(raw || '').replace(/[\\|]/g, ' ').replace(/\s+/g, ' ').trim();
-  let time = null; let day = null;
-  const m = t.match(/(\d{2})\.(\d{2})\.?(?:\d{2,4})?\s+(\d{1,2})[:.](\d{2})(?:[:.]\d{2})?\s+(.*)$/);
-  let rest = t;
-  if (m) { time = `${pad(m[3])}:${m[4]}`; day = { d: +m[1], m: +m[2] }; rest = m[5]; }
-  rest = rest
-    .replace(/^(POS|E-?COMM(ERCE)?|ECOM|BEZAHLUNG|KARTENZAHLUNG|KARTE|AUTOMAT|ATM|BANKOMAT|DEBIT|CONTACTLESS|NFC)\b\s*/i, '')
-    .replace(/^\d+[.,]\d{2}\s+[A-Z]{2}\s+[A-Z]\d\s+/, '')
-    .replace(/\b(MC|VISA|MAESTRO|DEBIT|KARTE)\s*\/?\s*\d{4,}\b/gi, ' ')
-    .replace(/\b(DANKT|DANKE|SAGT DANKE)\b/gi, ' ')
-    .replace(/\s+/g, ' ').trim();
+// ELBA-Text hat Felder wie "Verwendungszweck: … Zahlungsreferenz: … Kartenfolge-Nr.: 1"
+const LABELS = [
+  ['ibanEmpf', 'IBAN Zahlungsempf(?:ä|ae|a)nger'], ['bicEmpf', 'BIC Zahlungsempf(?:ä|ae|a)nger'], ['ibanAuf', 'IBAN Auftraggeber'], ['bicAuf', 'BIC Auftraggeber'],
+  ['empf', 'Zahlungsempf(?:ä|ae|a)nger'], ['pflicht', 'Zahlungspflichtiger'], ['auf', 'Auftraggeber'], ['empf2', 'Empf(?:ä|ae|a)nger'],
+  ['vz', 'Verwendungszweck'], ['ref', 'Zahlungsreferenz'], ['kfn', 'Kartenfolge-?Nr\\.?'], ['mandat', 'Mandat(?:sreferenz)?'], ['cred', 'Creditor[- ]?ID'],
+  ['btext', 'Buchungstext'], ['aufref', 'Auftraggeberreferenz'], ['kenn', 'Empf(?:ä|ae|a)nger-?Kennung'],
+];
+const LABEL_RE = new RegExp(`(?<![\\p{L}])(${LABELS.map((l) => l[1]).join('|')})\\s*:`, 'giu');
+function fields(t) {
+  const hits = []; let m; LABEL_RE.lastIndex = 0;
+  while ((m = LABEL_RE.exec(t))) { const key = (LABELS.find((l) => new RegExp(`^${l[1]}$`, 'iu').test(m[1])) || [m[1]])[0]; hits.push({ key, i: m.index, end: LABEL_RE.lastIndex }); }
+  if (!hits.length) return null;
+  const out = { _pre: t.slice(0, hits[0].i).trim() };
+  hits.forEach((h, n) => { out[h.key] = t.slice(h.end, n + 1 < hits.length ? hits[n + 1].i : t.length).trim(); });
+  return out;
+}
+const RE_WHEN = /(\d{2})\.(\d{2})\.?(?:\d{2,4})?\s+(\d{1,2})[:.](\d{2})(?:[:.]\d{2})?/;
+const CITY_PRE = /^(MARIA|ST\.?|SANKT|BAD)$/i;
+const CITY_LINK = /^(AM|AN|IM|BEI|OB|ZUM)$/i;
+// Kartenzahlungstext zerlegen: "NYX*SPARMARKTOBERTILLI OBERTILLIACH 9942" -> Geschäft, Ort
+function parseShop(src) {
+  let s = String(src || '').replace(/\b(DANKT|DANKE|SAGT DANKE)\b/gi, ' ').trim();
   let via = null;
-  const pm = rest.match(/^(SUMUP|SQ|ZETTLE|IZ|PAYPAL|PP|STRIPE|KLARNA|GOOGLE|APPLE PAY|NAYAX)\s*\*\s*/i);
-  if (pm) { via = titleCase(pm[1]); rest = rest.slice(pm[0].length); }
-  const toks = rest.split(' ').filter(Boolean);
-  let cut = toks.findIndex((x, i) => i > 0 && /^\d{2,}$/.test(x));
-  let merchantT = cut > 0 ? toks.slice(0, cut) : toks.slice(0, Math.min(toks.length, 4));
-  let placeT = cut > 0 ? toks.slice(cut + 1) : toks.slice(Math.min(toks.length, 4));
-  placeT = placeT.filter((x) => !/^\d+$/.test(x) && !/^(AT|AUT|DE|DEU|IT|CH)$/i.test(x) && !/^[A-Z]\d$/.test(x));
-  const merchant = titleCase(merchantT.join(' ')) || titleCase(rest).slice(0, 40) || 'Unbekannt';
-  const place = titleCase(placeT.join(' ').replace(/\d+/g, '').trim()).slice(0, 40);
-  return { time, day, merchant, place, via };
+  const pm = s.match(/^([A-Z0-9]{2,10}|APPLE PAY|GOOGLE PAY)\s?\*\s?/i);
+  if (pm) { via = pm[1].toUpperCase(); s = s.slice(pm[0].length); }
+  let name; let place;
+  const parts = s.split(/\s{2,}/).map((x) => x.trim()).filter(Boolean);
+  const notNum = (x) => !/^\d+$/.test(x) && !/^(AT|AUT|DE|DEU|IT|ITA|CH)$/i.test(x);
+  if (parts.length >= 2) { name = parts[0].split(' '); place = parts.slice(1).join(' ').split(' ').filter(notNum); }
+  else {
+    const toks = s.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    let end = toks.length; while (end > 1 && !notNum(toks[end - 1])) end--;
+    const tail = end < toks.length; const core = toks.slice(0, end);
+    const ni = core.findIndex((x, i) => i > 0 && /^\d{2,}$/.test(x));
+    if (ni > 0) { name = core.slice(0, ni); place = core.slice(ni + 1).filter(notNum); }
+    else if (tail && core.length >= 2) {
+      let k = core.length - 1;
+      while (k >= 2 && CITY_LINK.test(core[k - 1])) k -= 2;
+      if (k >= 2 && CITY_PRE.test(core[k - 1])) k--;
+      name = core.slice(0, k); place = core.slice(k);
+    } else { name = core; place = []; }
+  }
+  return { merchant: titleCase(name.join(' ')).slice(0, 40) || 'Unbekannt', place: titleCase(place.join(' ')).slice(0, 40), via: via && via !== 'POS' ? titleCase(via) : null };
+}
+function parseText(raw) {
+  const t = String(raw || '').replace(/[\\|]/g, ' ').trim();
+  const flat = t.replace(/\s+/g, ' ');
+  const f = fields(t);
+  let time = null; let day = null;
+  const findWhen = (x) => { const m = String(x || '').replace(/\s+/g, ' ').match(RE_WHEN); if (m && !time) { time = `${pad(m[3])}:${m[4]}`; day = { d: +m[1], m: +m[2] }; } return m; };
+  if (f) {
+    const ref = f.ref || ''; const vz = f.vz || '';
+    findWhen(ref); findWhen(vz); findWhen(f._pre);
+    const payee = f.empf || f.empf2 || f.auf || f.pflicht || '';
+    const cardish = 'kfn' in f || /\b(POS|E-?COMM|ECOM|AUTOMAT|ATM|BANKOMAT)\b/i.test(ref);
+    if (cardish) {
+      let shopText = vz;
+      if (!shopText) { const m = ref.replace(/\s+/g, ' ').match(RE_WHEN); shopText = m ? ref.replace(/\s+/g, ' ').slice(ref.replace(/\s+/g, ' ').indexOf(m[0]) + m[0].length) : ref; }
+      const sp = parseShop(shopText);
+      return { time, day, ...sp, purpose: vz || shopText };
+    }
+    const who = payee.replace(/\s+/g, ' ').trim();
+    const purpose = (vz || f.btext || ref || f._pre || '').replace(/\s+/g, ' ').trim();
+    return { time, day, merchant: titleCase(who || purpose.split(' ').slice(0, 4).join(' ')).slice(0, 40) || 'Abbuchung', place: '', via: null, purpose };
+  }
+  // Format ohne Feldnamen: "POS 12,50 AT D4 19.11. 14:23 BILLA DANKT 1234 SALZBURG 5020"
+  const m = flat.match(new RegExp(`${RE_WHEN.source}\\s+(.*)$`));
+  let rest = flat;
+  if (m) { time = `${pad(m[3])}:${m[4]}`; day = { d: +m[1], m: +m[2] }; rest = m[5]; }
+  rest = rest.replace(/^(POS|E-?COMM(ERCE)?|ECOM|BEZAHLUNG|KARTENZAHLUNG|KARTE|AUTOMAT|ATM|BANKOMAT|DEBIT|CONTACTLESS|NFC)\b\s*/i, '')
+    .replace(/^\d+[.,]\d{2}\s+[A-Z]{2}\s+[A-Z]\d\s+/, '').replace(/\b(MC|VISA|MAESTRO|DEBIT|KARTE)\s*\/?\s*\d{4,}\b/gi, ' ').trim();
+  return { time, day, ...parseShop(rest), purpose: rest };
 }
 const merchantKey = (m) => String(m || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').trim().split(/\s+/).slice(0, 3).join(' ');
 function txKind(text) {
   if (/\b(AUTOMAT|BARGELD|BEHEBUNG|GELDAUTOMAT|ATM|CASH)\b/i.test(text)) return 'atm';
+  if (/Kartenfolge/i.test(text)) return 'card';
   if (/\b(POS|E-?COMM|ECOM|KARTE|KARTENZAHLUNG|MC\/|VISA|MAESTRO|DEBIT|BEZAHLUNG|APPLE PAY|GOOGLE PAY|CONTACTLESS|NFC)\b/i.test(text)) return 'card';
   return 'other';
 }
@@ -204,24 +267,38 @@ function parseCsv(text, map) {
   });
   return { rows, cols, out, sep };
 }
-function buildTx(row) {
-  const p = parseText(row.raw);
-  let date = row.date; let time = p.time;
-  const tsm = row.ts && row.ts.match(RE_TS);
+// Felder einer Bank-Ausgabe aus dem Text setzen (auch für spätere Verbesserungen der Erkennung)
+function applyParse(tx, raw, booked, ts) {
+  const p = parseText(raw);
+  let date = booked; let time = p.time;
+  const tsm = ts && ts.match(RE_TS);
   if (!time && tsm) time = tsm[4] ? `${pad(tsm[4])}:${tsm[5]}` : `${tsm[9]}:${tsm[10]}`;
-  // Kaufdatum aus dem Text (Buchung kommt oft 1–3 Tage später)
-  if (p.day) {
-    const b = parseDay(row.date); let y = b.getFullYear(); if (p.day.m > b.getMonth() + 1) y--;
-    const cand = `${y}-${pad(p.day.m)}-${pad(p.day.d)}`; if (cand <= row.date) date = cand;
+  if (p.day) { // Kaufdatum aus dem Text (Buchung kommt oft 1–3 Tage später)
+    const b = parseDay(booked); let y = b.getFullYear(); if (p.day.m > b.getMonth() + 1) y--;
+    const cand = `${y}-${pad(p.day.m)}-${pad(p.day.d)}`; if (cand <= booked) date = cand;
   }
-  const kind = txKind(row.raw);
-  if (kind === 'atm') { // Behebung: Geschäft = Bargeld, Ort = Wörter ohne Nummern
-    p.merchant = 'Bargeld-Behebung';
-    const words = row.raw.replace(/.*\d{1,2}[:.]\d{2}\s+/, '').split(/\s+/).filter((w) => /^\p{L}{3,}$/u.test(w) && !/^(BANKOMAT|AUTOMAT|ATM|GELDAUTOMAT|BEHEBUNG|BARGELD|AT|RAIFFEISEN|RAIKA|BANK|SPARKASSE|BAWAG|FILIALE)$/i.test(w));
-    p.place = titleCase(words.join(' ')).slice(0, 40);
+  const kind = txKind(raw);
+  if (kind === 'atm') {
+    const src = p.purpose || raw.replace(/.*\d{1,2}[:.]\d{2}\s+/, '');
+    const words = src.split(/\s+/).filter((w) => /^\p{L}{3,}$/u.test(w) && !/^(BANKOMAT|AUTOMAT|ATM|GELDAUTOMAT|BEHEBUNG|BARGELD|AT|RAIFFEISEN|RAIKA|RAIFFEISENBANK|BANK|SPARKASSE|BAWAG|FILIALE|KARTENFOLGE)$/i.test(w));
+    p.merchant = 'Bargeld-Behebung'; p.place = titleCase(words.join(' ')).slice(0, 40);
   }
+  Object.assign(tx, { date, booked, time: time || tx.time || null, raw, merchant: p.merchant, place: p.place, via: p.via, purpose: p.purpose || '', mkey: kind === 'atm' ? 'bargeld behebung' : merchantKey(p.merchant), kind });
+  return tx;
+}
+function buildTx(row) {
   const id = `e${hash(`${row.date}|${row.amount}|${row.raw}|${row.ts}`)}`;
-  return { id, date, booked: row.date, time, amount: r2(Math.abs(row.amount)), raw: row.raw, merchant: p.merchant, place: p.place, via: p.via, mkey: merchantKey(p.merchant), kind, src: 'elba', alloc: [], created: Date.now() };
+  return applyParse({ id, amount: r2(Math.abs(row.amount)), src: 'elba', alloc: [], created: Date.now() }, row.raw, row.date, row.ts);
+}
+// Nach einem Update: bereits eingelesene Ausgaben neu erkennen (Zuordnungen bleiben)
+const PARSER = 2;
+function migrate() {
+  if ((db.parser || 1) >= PARSER) return;
+  const junk = /kartenfolge|verwendungszweck|zahlungsreferenz/;
+  Object.values(db.tx).forEach((t) => { if (t.src === 'elba' && t.raw) applyParse(t, t.raw, t.booked || t.date, null); });
+  Object.keys(db.rules).forEach((k) => { if (junk.test(k)) delete db.rules[k]; });
+  Object.keys(db.lookups).forEach((k) => { if (junk.test(k)) delete db.lookups[k]; });
+  db.parser = PARSER; save();
 }
 
 let pendingImport = null;
@@ -338,7 +415,7 @@ async function lookupQueue() {
     for (const t of todo.slice(0, 40)) { await lookupOne(t); render(true); await sleep(1100); } // OpenStreetMap: max. 1 Anfrage pro Sekunde
   } finally { searching = false; }
 }
-const googleUrl = (tx) => `https://www.google.com/search?q=${encodeURIComponent(`${tx.merchant} ${tx.place || ''} ${(tx.raw || '').slice(0, 60)}`.trim())}`;
+const googleUrl = (tx) => `https://www.google.com/search?q=${encodeURIComponent((tx.purpose && tx.kind !== 'other' ? tx.purpose.replace(/^\w{2,10}\s?\*\s?/, '') : `${tx.merchant} ${tx.place || ''}`).replace(/\s+/g, ' ').trim())}`;
 
 // ---------- Zuordnen ----------
 function assign(tx, target, remember = true) {
@@ -354,7 +431,7 @@ function applySplit(tx, parts, remember) {
   save();
 }
 function suggestion(tx) {
-  const r = db.rules[tx.mkey];
+  const r = tx.mkey ? db.rules[tx.mkey] : null;
   if (!r) return null;
   if (typeof r === 'string') return r === 'ignore' ? { label: 'Ignorieren', target: 'ignore' } : r.startsWith('g:') ? { label: (db.groups.find((g) => g.id === r.slice(2)) || {}).name, target: r } : person(r) ? { label: pname(r), target: r } : null;
   if (r.split) return { label: r.split.map(([p, f]) => `${pname(p)} ${Math.round(f * 100)} %`).join(' / '), split: r.split };
@@ -404,7 +481,7 @@ function txCard(t, mode) {
   const sug = mode === 'todo' ? suggestion(t) : null;
   const meta = [i.place, `${fmtDay(t.date)}${t.time ? ` · ${t.time}` : ''}`, KIND_LABEL[t.kind] || ''].filter(Boolean).join(' · ');
   const chips = mode === 'todo' ? `<div class="chips">
-      ${sug ? `<button class="chip sugg" data-sug="${esc(t.id)}">✓ ${esc(sug.label)}</button>` : ''}
+      ${sug ? `<button class="chip sugg" data-sug="${esc(t.id)}">Vorschlag: ${esc(sug.label)} ✓</button>` : ''}
       ${db.persons.map((p) => `<button class="chip" data-as="${esc(t.id)}|${esc(p.id)}"><span class="pdot" style="background:${p.color}"></span>${esc(p.name)}</button>`).join('')}
       ${db.groups.map((g) => `<button class="chip" data-as="${esc(t.id)}|g:${esc(g.id)}">👥 ${esc(g.name)}</button>`).join('')}
       <button class="chip ghost" data-split="${esc(t.id)}">✂️ Aufteilen</button>
@@ -414,6 +491,7 @@ function txCard(t, mode) {
     <button class="tx-head" data-open="${esc(t.id)}">
       <span class="tx-ico" title="${esc(i.catLabel)}">${i.icon}</span>
       <span class="tx-main"><span class="tx-name">${esc(i.name)}</span><span class="tx-meta">${esc(meta)}</span>
+        ${t.purpose ? `<span class="tx-purpose">${esc(t.purpose)}</span>` : ''}
         ${i.found ? `<span class="found">🔎 ${esc([i.catLabel !== 'Sonstiges' ? i.catLabel : '', i.found.desc || '', `laut ${i.found.src}`].filter(Boolean).join(' · '))}</span>` : ''}</span>
       <span class="tx-amt num">${money(t.amount)}</span>
     </button>${chips}</div>`;
@@ -433,7 +511,7 @@ function todoHtml() {
   const withSug = list.filter((t) => suggestion(t));
   const bk = backupDue();
   return `${bk ? `<div class="warn-box">💾 ${bk} <button class="btn small" data-act="backup" style="margin-top:8px">Jetzt sichern</button></div>` : ''}
-    ${list.length ? `<p class="hint" style="margin-top:0">${list.length} Ausgabe${list.length === 1 ? '' : 'n'} noch zuordnen. Tipp auf eine Person – oder auf <b>✓ Vorschlag</b>.</p>
+    ${list.length ? `<p class="hint" style="margin-top:0">${list.length} Ausgabe${list.length === 1 ? '' : 'n'} noch zuordnen. Tipp auf eine Person – oder auf den <b>Vorschlag</b>.</p>
       ${withSug.length > 1 ? `<button class="btn" data-act="allSug">✓ Alle ${withSug.length} Vorschläge übernehmen</button>` : ''}
       ${list.map((t) => txCard(t, 'todo')).join('')}`
       : `<div class="empty"><span class="big">🎉</span>Alles zugeordnet!<br><button class="btn primary" data-act="import" style="margin-top:14px">⬇️ Neue Umsätze einlesen</button></div>`}
@@ -458,7 +536,7 @@ function allHtml() {
   if (filterP === 'none') list = list.filter((t) => !t.ignored && !(t.alloc || []).length);
   else if (filterP === 'ignored') list = list.filter((t) => t.ignored);
   else if (filterP !== 'all') list = list.filter((t) => (t.alloc || []).some((a) => a.p === filterP));
-  if (q) list = list.filter((t) => { const i = info(t); return `${i.name} ${i.place} ${t.raw} ${t.note || ''} ${i.catLabel}`.toLowerCase().includes(q); });
+  if (q) list = list.filter((t) => { const i = info(t); return `${i.name} ${i.place} ${t.purpose || ''} ${t.raw} ${t.note || ''} ${i.catLabel}`.toLowerCase().includes(q); });
   list.sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || '')));
   const amtOf = (t) => (filterP !== 'all' && filterP !== 'none' && filterP !== 'ignored' ? (t.alloc || []).filter((a) => a.p === filterP).reduce((s, a) => s + a.amt, 0) : t.amount);
   const sum = list.reduce((s, t) => s + amtOf(t), 0);
@@ -532,7 +610,7 @@ function viewTx(id) {
   return () => {
     const t = db.tx[id]; if (!t) return null;
     const i = info(t); const lk = db.lookups[t.mkey] || {};
-    const rows = [['Wo', i.name], ['Art', `${i.icon} ${i.catLabel}`], ['Ort', i.place || '–'], lk.addr ? ['Adresse', lk.addr] : null, ['Wann', `${fmtDay(t.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${t.time ? `, ${t.time} Uhr` : ''}`],
+    const rows = [['Wo', i.name], t.purpose ? ['Verwendungszweck', t.purpose] : null, ['Art', `${i.icon} ${i.catLabel}`], ['Ort', i.place || '–'], lk.addr ? ['Adresse', lk.addr] : null, ['Wann', `${fmtDay(t.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${t.time ? `, ${t.time} Uhr` : ''}`],
       t.booked && t.booked !== t.date ? ['Gebucht am', fmtDay(t.booked, { day: '2-digit', month: '2-digit', year: 'numeric' })] : null, ['Betrag', money(t.amount)], ['Bezahlt mit', `${KIND_LABEL[t.kind] || '–'}${t.via ? ` (über ${t.via})` : ''}`]].filter(Boolean);
     return {
       title: i.name,
@@ -840,9 +918,10 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#she
 $('#fileCsv').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) onCsvFile(f); };
 $('#fileBackup').onchange = (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) importBackup(f); };
 window.addEventListener('online', lookupQueue);
+migrate();
 render();
 lookupQueue();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 // für Tests
-window.__ausgaben = { parseText, parseCsv, detectColumns, buildTx };
+window.__ausgaben = { parseShop, parseText, parseCsv, detectColumns, buildTx };
 })();
